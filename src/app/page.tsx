@@ -69,12 +69,12 @@ export default function Home() {
     users.find((u) => u.id === currentUserId) ||
     users[0] || {
       id: "usr-admin-1",
-      firstName: "Roman",
-      lastName: "Admin",
+      firstName: "Marcin",
+      lastName: "Bajda",
       role: "Kierownik Operacyjny",
       isForeman: true,
       isAdmin: true,
-      login: "admin",
+      login: "m.bajda",
       createdAt: new Date().toISOString(),
     };
 

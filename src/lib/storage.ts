@@ -3,12 +3,12 @@ import { ConstructionSite, DiscussedTopicTemplate, User, TenantSettings, DailyRe
 export const INITIAL_USERS: User[] = [
   {
     id: "usr-admin-1",
-    firstName: "Roman",
-    lastName: "Administrator",
+    firstName: "Marcin",
+    lastName: "Bajda",
     role: "Kierownik Operacyjny / Admin",
     isForeman: true,
     isAdmin: true,
-    login: "admin",
+    login: "m.bajda",
     password: "password123",
     createdAt: new Date().toISOString(),
   },
@@ -187,7 +187,21 @@ export const getStoredUsers = (): User[] => {
       localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(INITIAL_USERS));
       return INITIAL_USERS;
     }
-    return JSON.parse(data);
+    const parsed: User[] = JSON.parse(data);
+    // Automatyczna migracja jeśli w pamięci telefonu pozostał Roman Administrator
+    const migrated = parsed.map((u) => {
+      if (u.id === "usr-admin-1" && u.firstName === "Roman") {
+        return {
+          ...u,
+          firstName: "Marcin",
+          lastName: "Bajda",
+          login: "m.bajda",
+        };
+      }
+      return u;
+    });
+    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(migrated));
+    return migrated;
   } catch {
     return INITIAL_USERS;
   }
