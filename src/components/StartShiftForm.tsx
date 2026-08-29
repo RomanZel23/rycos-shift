@@ -530,7 +530,7 @@ export function StartShiftForm({
 
                     <div className="flex items-center gap-3">
                       {/* MINIATURKA PODPISU */}
-                      <div className="bg-slate-50 dark:bg-white border border-slate-200 dark:border-slate-300 rounded-lg p-1 w-24 sm:w-28 h-10 flex items-center justify-center overflow-hidden shadow-inner">
+                      <div className="bg-white border border-slate-200 dark:border-slate-700 rounded-lg p-1 w-24 sm:w-28 h-10 flex items-center justify-center overflow-hidden shadow-inner">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={attendee.signatureDataUrl}
