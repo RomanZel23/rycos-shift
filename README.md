@@ -1,36 +1,80 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# RYCOS Shift – System Raportów Terenowych
 
-## Getting Started
+Dedykowany, zoptymalizowany pod urządzenia mobilne (smartfony, iPhone, tablety, iPad) system raportowania dziennego dla zespołów **SB Technology / SolutionsBay** (oddział Poznań) z możliwością rozszerzania na kolejne instancje, generalnych wykonawców i podwykonawców.
 
-First, run the development server:
+---
 
+## 📱 Główne Funkcjonalności
+
+1. **Raport dzienny – Rozpoczęcie prac zespołu (Odprawa BHP & Lista Obecności):**
+   - Automatyczna data i godzina otwarcia.
+   - Wybór Placu Budowy (*Poznań - Piątkowo*, *Poznań - Franowo* itd.).
+   - Wybór Brygadzisty prowadzącego.
+   - Automatyczny odczyt współrzędnych GPS (szerokość i długość geograficzna).
+   - **Omawiane obszary (BHP / Zakres robót):**
+     - Wpisanie ręczne
+     - Szybki wybór ze zdefiniowanych szablonów
+     - **Wprowadzanie głosowe (mikrofon / Web Speech API)**
+   - **Lista obecności z podpisami dotykowymi:**
+     - Dedykowany modal dla Brygadzisty
+     - Modal dla Pracowników z listą wyboru
+     - Canvas do podpisu palcem / rysikiem z blokadą przewijania (`touch-action: none`)
+     - Aktywacja przycisku „OK” wyłącznie po złożeniu czytelnego podpisu
+   - **Wysyłka i generowanie:**
+     - Generowanie eleganckiego PDF z zachowaniem szablonu SB Technology, GPS i formuły `[Koniec raportu]`
+     - Format pliku: `RRRR.MM.DD_Rozpoczęcie prac zespołu_[PlacBudowy].pdf`
+     - Wysyłka e-mail za pośrednictwem Resend API na skonfigurowaną listę odbiorców.
+
+2. **Raport dzienny – Zakończenie prac zespołu (Dokumentacja Fotograficzna):**
+   - Wybór placu, brygadzisty, data, godzina, GPS.
+   - Wywołanie natywnego aparatu w smartfonie (`capture="environment"`) lub wybór z galerii.
+   - Kompresja zdjęć w przeglądarce przed wysłaniem (oszczędność transferu LTE).
+   - Opis zdjęć wprowadzany ręcznie lub dyktowany głosem.
+   - Dowolna liczba zdjęć z opisami w układzie siatki.
+   - Format pliku: `RRRR.MM.DD_Zakończenie prac zespołu_[PlacBudowy].pdf`.
+
+3. **Archiwum Raportów (Repozytorium):**
+   - Przeglądanie wygenerowanych raportów.
+   - Wyszukiwarka i filtrowanie po placu, dacie i typie.
+   - Szybki podgląd i pobieranie plików PDF.
+
+4. **Panel Administracyjny (Ustawienia – tylko dla Admina):**
+   - Zarządzanie użytkownikami (Imię, Nazwisko, Rola, checkbox Brygadzista, checkbox Admin, Login, Hasło).
+   - Zarządzanie placami budów (CRUD).
+   - Zarządzanie szablonami omawianych obszarów / tematów BHP.
+   - Konfiguracja list mailingowych dla rozpoczęcia i zakończenia prac.
+   - Konfiguracja klucza Resend API i nadawcy.
+   - Konfiguracja instancji (Multi-Tenant).
+
+---
+
+## 🚀 Uruchomienie Lokalne
+
+1. Zainstaluj zależności:
+   ```bash
+   pnpm install
+   ```
+
+2. Uruchom serwer deweloperski:
+   ```bash
+   pnpm dev
+   ```
+
+3. Otwórz [http://localhost:3000](http://localhost:3000) w przeglądarce (lub w narzędziach deweloperskich w trybie symulacji iPhone / iPad / Android).
+
+---
+
+## 🌐 Wdrożenie (Deployment)
+
+### Vercel:
+1. Połącz repozytorium z kontem na [Vercel](https://vercel.com).
+2. Dodaj zmienne środowiskowe:
+   - `RESEND_API_KEY`: Twój klucz API z [resend.com](https://resend.com)
+   - `RESEND_FROM_EMAIL`: (opcjonalnie) zweryfikowana domena nadawcy, np. `raporty@solutionsbay.pl` lub `onboarding@resend.dev`
+3. Kliknij **Deploy**.
+
+### Własny VPS (Docker):
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+docker compose up -d --build
 ```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Aplikacja uruchomi się na porcie `3000`.

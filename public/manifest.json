@@ -1,0 +1,18 @@
+{
+  "name": "RYCOS Shift | SB Technology",
+  "short_name": "RYCOS Shift",
+  "description": "System raportowania dziennego rozpoczęcia i zakończenia prac",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

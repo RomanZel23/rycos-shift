@@ -1,0 +1,15 @@
+services:
+  rycos-shift:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rycos-shift-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - RESEND_API_KEY=${RESEND_API_KEY}
+      - RESEND_FROM_EMAIL=${RESEND_FROM_EMAIL:-raporty@solutionsbay.pl}
+    volumes:
+      - ./data:/app/data
