@@ -26,7 +26,7 @@ import {
 } from "@/types";
 import { GeoLocationBadge } from "./GeoLocationBadge";
 import { VoiceInputButton } from "./VoiceInputButton";
-import { generateReportPDF } from "@/lib/pdf-generator";
+import { generateReportPDFAsync } from "@/lib/pdf-generator";
 import { saveStoredReport } from "@/lib/storage";
 
 interface EndShiftFormProps {
@@ -196,7 +196,8 @@ export function EndShiftForm({
         status: "SENT",
       };
 
-      const pdfResult = generateReportPDF(reportData);
+      // 1. Generowanie PDF za pomocą silnika HTML
+      const pdfResult = await generateReportPDFAsync(reportData, settings);
       reportData.pdfFileName = pdfResult.fileName;
       reportData.pdfDataUrl = pdfResult.dataUrl;
 
@@ -245,9 +246,9 @@ export function EndShiftForm({
     setTime(now.toTimeString().slice(0, 5));
   };
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
     if (!successReport) return;
-    const pdfResult = generateReportPDF(successReport);
+    const pdfResult = await generateReportPDFAsync(successReport, settings);
     const link = document.createElement("a");
     link.href = URL.createObjectURL(pdfResult.blob);
     link.download = pdfResult.fileName;

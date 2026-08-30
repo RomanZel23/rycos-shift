@@ -29,7 +29,7 @@ import {
 import { GeoLocationBadge } from "./GeoLocationBadge";
 import { SignatureModal } from "./SignatureModal";
 import { AddTopicModal } from "./AddTopicModal";
-import { generateReportPDF } from "@/lib/pdf-generator";
+import { generateReportPDFAsync } from "@/lib/pdf-generator";
 import { saveStoredReport } from "@/lib/storage";
 
 interface StartShiftFormProps {
@@ -181,8 +181,8 @@ export function StartShiftForm({
         status: "SENT",
       };
 
-      // 1. Generowanie PDF
-      const pdfResult = generateReportPDF(reportData);
+      // 1. Generowanie PDF za pomocą silnika HTML (100% polskich znaków UTF-8)
+      const pdfResult = await generateReportPDFAsync(reportData, settings);
       reportData.pdfFileName = pdfResult.fileName;
       reportData.pdfDataUrl = pdfResult.dataUrl;
 
@@ -234,12 +234,11 @@ export function StartShiftForm({
     setTime(now.toTimeString().slice(0, 5));
   };
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
     if (!successReport) return;
-    const pdfResult = generateReportPDF(successReport);
+    const pdfResult = await generateReportPDFAsync(successReport, settings);
     const link = document.createElement("a");
     link.href = URL.createObjectURL(pdfResult.blob);
-    link.download = pdfResult.fileName;
     link.click();
   };
 

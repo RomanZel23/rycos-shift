@@ -16,7 +16,7 @@ import {
   Camera,
 } from "lucide-react";
 import { DailyReport } from "@/types";
-import { generateReportPDF } from "@/lib/pdf-generator";
+import { generateReportPDFAsync } from "@/lib/pdf-generator";
 
 interface ReportArchiveProps {
   reports: DailyReport[];
@@ -44,8 +44,8 @@ export function ReportArchive({
     return matchesType && matchesSearch;
   });
 
-  const handleDownload = (report: DailyReport) => {
-    const result = generateReportPDF(report);
+  const handleDownload = async (report: DailyReport) => {
+    const result = await generateReportPDFAsync(report);
     const link = document.createElement("a");
     link.href = URL.createObjectURL(result.blob);
     link.download = result.fileName;
