@@ -44,7 +44,6 @@ export function EndShiftForm({
   onReportCreated,
   onNavigateToArchive,
 }: EndShiftFormProps) {
-  // Automatyczna data i godzina otwarcia
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
 
@@ -59,12 +58,10 @@ export function EndShiftForm({
   const [photos, setPhotos] = useState<PhotoDocumentationItem[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Stan nowego zdjęcia w trakcie dodawania
   const [tempPhotoUrl, setTempPhotoUrl] = useState<string | null>(null);
   const [tempDescription, setTempDescription] = useState("");
   const [isAddingPhoto, setIsAddingPhoto] = useState(false);
 
-  // Statusy wysyłki
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successReport, setSuccessReport] = useState<DailyReport | null>(null);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
@@ -90,7 +87,6 @@ export function EndShiftForm({
   const selectedForeman = users.find((u) => u.id === foremanId);
   const selectedSite = sites.find((s) => s.id === siteId);
 
-  // Kompresja zdjęcia w przeglądarce przed zapisaniem
   const processImageFile = (file: File) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -98,31 +94,24 @@ export function EndShiftForm({
       img.onload = () => {
         const canvas = document.createElement("canvas");
         const MAX_WIDTH = 1200;
-        const MAX_HEIGHT = 1200;
         let width = img.width;
         let height = img.height;
 
-        if (width > height) {
-          if (width > MAX_WIDTH) {
-            height *= MAX_WIDTH / width;
-            width = MAX_WIDTH;
-          }
-        } else {
-          if (height > MAX_HEIGHT) {
-            width *= MAX_HEIGHT / height;
-            height = MAX_HEIGHT;
-          }
+        if (width > MAX_WIDTH) {
+          height = Math.round((height * MAX_WIDTH) / width);
+          width = MAX_WIDTH;
         }
 
         canvas.width = width;
         canvas.height = height;
         const ctx = canvas.getContext("2d");
-        ctx?.drawImage(img, 0, 0, width, height);
-
-        // Zoptymalizowany JPEG do przesyłania mobilnego
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
-        setTempPhotoUrl(dataUrl);
-        setIsAddingPhoto(true);
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.75);
+          setTempPhotoUrl(compressedDataUrl);
+          setTempDescription("");
+          setIsAddingPhoto(true);
+        }
       };
       img.src = e.target?.result as string;
     };
@@ -130,11 +119,10 @@ export function EndShiftForm({
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      processImageFile(file);
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      processImageFile(files[0]);
     }
-    // Zresetuj input, aby umożliwić ponowny wybór tego samego pliku
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -142,11 +130,10 @@ export function EndShiftForm({
 
   const handleConfirmAddPhoto = () => {
     if (!tempPhotoUrl) return;
-
     const newItem: PhotoDocumentationItem = {
-      id: "photo-" + Date.now(),
+      id: "photo-" + Date.now() + "-" + Math.random().toString(36).substr(2, 4),
       photoDataUrl: tempPhotoUrl,
-      description: tempDescription.trim() || "Dokumentacja stanu robót",
+      description: tempDescription.trim() || "Dokumentacja stanu robót na placu budowy.",
       takenAt: new Date().toISOString(),
     };
 
@@ -179,7 +166,7 @@ export function EndShiftForm({
       return;
     }
     if (photos.length === 0) {
-      setErrorBanner("Dodaj co najmniej jedno zdjęcie z opisem wykonanych robót.");
+      setErrorBanner("Dodaj co najmniej jedno zdjęcie z dokumentacją wykonanych prac.");
       return;
     }
 
@@ -209,12 +196,10 @@ export function EndShiftForm({
         status: "SENT",
       };
 
-      // 1. Generowanie PDF
       const pdfResult = generateReportPDF(reportData);
       reportData.pdfFileName = pdfResult.fileName;
       reportData.pdfDataUrl = pdfResult.dataUrl;
 
-      // 2. Wysłanie mailem przez Resend API
       try {
         const response = await fetch("/api/send-report", {
           method: "POST",
@@ -240,7 +225,6 @@ export function EndShiftForm({
         console.warn("Mail dispatch error:", mailErr);
       }
 
-      // 3. Zapis do archiwum
       saveStoredReport(reportData);
       if (onReportCreated) onReportCreated(reportData);
 
@@ -271,26 +255,24 @@ export function EndShiftForm({
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto pb-28 md:pb-16">
-      {/* BANER SUKCESU */}
+    <div className="w-full max-w-4xl mx-auto pb-32 md:pb-20">
       {successReport ? (
-        <div className="bg-white dark:bg-slate-900 border-2 border-emerald-500/40 rounded-2xl p-6 sm:p-8 shadow-xl text-center space-y-5 animate-fade-in">
-          <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mx-auto shadow-inner">
-            <CheckCircle2 className="w-9 h-9" />
+        <div className="bg-white dark:bg-slate-900 border-2 border-indigo-500 rounded-3xl p-6 sm:p-10 shadow-2xl text-center space-y-6 animate-fade-in">
+          <div className="w-20 h-20 bg-indigo-100 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center justify-center mx-auto shadow-inner">
+            <CheckCircle2 className="w-12 h-12" />
           </div>
           <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
+            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">
               Raport Zakończenia Prac Został Wysłany!
             </h2>
-            <p className="text-sm text-slate-600 dark:text-slate-300 mt-1 max-w-lg mx-auto">
-              Dokument PDF <strong>{successReport.pdfFileName}</strong> zawierający dokumentację
-              fotograficzną został zapisany i wysłany na adresy:
+            <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 mt-2 max-w-xl mx-auto font-medium">
+              Dokument PDF z fotorelacją <strong>{successReport.pdfFileName}</strong> został wygenerowany i przesłany do:
             </p>
-            <div className="mt-2 flex flex-wrap justify-center gap-1.5 max-w-md mx-auto">
+            <div className="mt-3 flex flex-wrap justify-center gap-2 max-w-lg mx-auto">
               {successReport.sentToEmails.map((email, idx) => (
                 <span
                   key={idx}
-                  className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs rounded-lg font-mono"
+                  className="px-3.5 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs sm:text-sm rounded-xl font-mono font-bold border border-slate-300 dark:border-slate-700"
                 >
                   {email}
                 </span>
@@ -298,90 +280,90 @@ export function EndShiftForm({
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-3">
             <button
               type="button"
               onClick={handleDownloadPDF}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl shadow-md shadow-sky-600/20 active:scale-95 transition-all cursor-pointer"
+              className="w-full sm:w-auto flex items-center justify-center gap-2.5 px-8 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-base sm:text-lg rounded-2xl shadow-xl shadow-indigo-600/30 active:scale-95 transition-all cursor-pointer"
             >
-              <Download className="w-4 h-4" />
+              <Download className="w-5 h-5" />
               Pobierz plik PDF
             </button>
             {onNavigateToArchive && (
               <button
                 type="button"
                 onClick={onNavigateToArchive}
-                className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold rounded-xl border border-slate-300 dark:border-slate-700 active:scale-95 transition-all cursor-pointer"
+                className="w-full sm:w-auto flex items-center justify-center gap-2.5 px-8 py-4 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-900 dark:text-white font-black text-base sm:text-lg rounded-2xl border-2 border-slate-300 dark:border-slate-700 active:scale-95 transition-all cursor-pointer"
               >
-                <FileText className="w-4 h-4" />
+                <FileText className="w-5 h-5" />
                 Zobacz w Archiwum
               </button>
             )}
             <button
               type="button"
               onClick={resetForm}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl active:scale-95 transition-all cursor-pointer"
+              className="w-full sm:w-auto flex items-center justify-center gap-2.5 px-8 py-4 bg-slate-900 hover:bg-slate-800 text-white font-black text-base sm:text-lg rounded-2xl active:scale-95 transition-all cursor-pointer"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-5 h-5" />
               Nowy Raport
             </button>
           </div>
         </div>
       ) : (
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-6">
           {/* NAGŁÓWEK KARTY */}
-          <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 text-white rounded-2xl p-5 sm:p-6 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 text-white rounded-3xl p-6 sm:p-8 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-5 border border-slate-700/50">
             <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-semibold uppercase tracking-wider mb-2 border border-indigo-500/30">
-                <Camera className="w-3.5 h-3.5" />
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-500/25 text-indigo-300 text-xs sm:text-sm font-black uppercase tracking-wider mb-2.5 border border-indigo-500/40">
+                <Camera className="w-4 h-4" />
                 <span>Formularz Zdaniowy</span>
               </div>
-              <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white">
+              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white leading-tight">
                 Zakończenie Prac Zespołu
               </h1>
-              <p className="text-xs sm:text-sm text-slate-300 mt-0.5">
+              <p className="text-sm sm:text-base text-slate-300 mt-1 font-medium">
                 Dokumentacja fotograficzna wykonanych robót z opisami głosowymi lub tekstowymi
               </p>
             </div>
 
             {/* DATA I GODZINA */}
-            <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md px-3.5 py-2.5 rounded-xl border border-white/10 text-xs">
-              <div className="flex items-center gap-1.5 text-slate-200">
-                <Calendar className="w-4 h-4 text-indigo-400" />
-                <span className="font-semibold">{date || "YYYY-MM-DD"}</span>
+            <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md px-4 py-3 rounded-2xl border border-white/15 text-sm sm:text-base font-extrabold self-start sm:self-auto">
+              <div className="flex items-center gap-2 text-slate-100">
+                <Calendar className="w-5 h-5 text-indigo-400" />
+                <span>{date || "YYYY-MM-DD"}</span>
               </div>
               <span className="text-white/40">|</span>
-              <div className="flex items-center gap-1.5 text-slate-200">
-                <Clock className="w-4 h-4 text-indigo-400" />
-                <span className="font-semibold">{time || "00:00"}</span>
+              <div className="flex items-center gap-2 text-slate-100">
+                <Clock className="w-5 h-5 text-indigo-400" />
+                <span>{time || "00:00"}</span>
               </div>
             </div>
           </div>
 
           {errorBanner && (
-            <div className="p-4 bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900 rounded-xl text-rose-800 dark:text-rose-200 text-sm font-medium flex items-center gap-2.5 animate-shake">
-              <AlertTriangle className="w-5 h-5 flex-shrink-0 text-rose-600" />
+            <div className="p-4 sm:p-5 bg-rose-50 dark:bg-rose-950/70 border-2 border-rose-300 dark:border-rose-800 rounded-2xl text-rose-900 dark:text-rose-100 text-sm sm:text-base font-bold flex items-center gap-3 animate-shake shadow-md">
+              <AlertTriangle className="w-6 h-6 flex-shrink-0 text-rose-600" />
               <span>{errorBanner}</span>
             </div>
           )}
 
           {/* KROK 1: PLAC BUDOWY, BRYGADZISTA & GPS */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-sm space-y-4">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2">
-              <Building2 className="w-4 h-4 text-indigo-600" />
+          <div className="bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 rounded-3xl p-5 sm:p-7 shadow-md space-y-5">
+            <h2 className="text-base sm:text-xl font-black uppercase tracking-tight text-slate-900 dark:text-white flex items-center gap-2.5 pb-1 border-b border-slate-100 dark:border-slate-800">
+              <Building2 className="w-5 h-5 text-indigo-600" />
               <span>1. Dane podstawowe i lokalizacja</span>
             </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                <label className="block text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-200 mb-2">
                   Plac Budowy: <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
                   <select
                     value={siteId}
                     onChange={(e) => setSiteId(e.target.value)}
-                    className="w-full px-3.5 pr-10 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-semibold text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none appearance-none truncate"
+                    className="w-full h-14 px-4 pr-12 bg-slate-50 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 rounded-2xl text-base sm:text-lg font-bold text-slate-900 dark:text-white focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none appearance-none truncate cursor-pointer shadow-inner"
                   >
                     {sites.map((s) => (
                       <option key={s.id} value={s.id}>
@@ -389,19 +371,19 @@ export function EndShiftForm({
                       </option>
                     ))}
                   </select>
-                  <Building2 className="w-4 h-4 text-slate-400 absolute right-3.5 top-3.5 pointer-events-none" />
+                  <Building2 className="w-5 h-5 text-slate-400 absolute right-4 top-4.5 pointer-events-none" />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                <label className="block text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-200 mb-2">
                   Brygadzista zdający zmianę: <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
                   <select
                     value={foremanId}
                     onChange={(e) => setForemanId(e.target.value)}
-                    className="w-full px-3.5 pr-10 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-semibold text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none appearance-none truncate"
+                    className="w-full h-14 px-4 pr-12 bg-slate-50 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 rounded-2xl text-base sm:text-lg font-bold text-slate-900 dark:text-white focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none appearance-none truncate cursor-pointer shadow-inner"
                   >
                     {foremen.map((f) => (
                       <option key={f.id} value={f.id}>
@@ -409,7 +391,7 @@ export function EndShiftForm({
                       </option>
                     ))}
                   </select>
-                  <UserCheck className="w-4 h-4 text-slate-400 absolute right-3.5 top-3.5 pointer-events-none" />
+                  <UserCheck className="w-5 h-5 text-slate-400 absolute right-4 top-4.5 pointer-events-none" />
                 </div>
               </div>
             </div>
@@ -418,19 +400,18 @@ export function EndShiftForm({
           </div>
 
           {/* KROK 2: DOKUMENTACJA FOTOGRAFICZNA */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-sm space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 rounded-3xl p-5 sm:p-7 shadow-md space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1 border-b border-slate-100 dark:border-slate-800">
               <div>
-                <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2">
-                  <Camera className="w-4 h-4 text-indigo-600" />
+                <h2 className="text-base sm:text-xl font-black uppercase tracking-tight text-slate-900 dark:text-white flex items-center gap-2.5">
+                  <Camera className="w-5 h-5 text-indigo-600" />
                   <span>2. Dokumentacja wykonanych robót</span>
                 </h2>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Zrób zdjęcie aparatem lub załącz plik z galerii i dodaj opis
+                <p className="text-xs sm:text-sm font-semibold text-slate-500 mt-0.5">
+                  Zrób zdjęcie aparatem lub załącz z galerii
                 </p>
               </div>
 
-              {/* UKRYTY INPUT PLIKÓW DLA APARATU / GALERII */}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -444,30 +425,30 @@ export function EndShiftForm({
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-indigo-600/20 active:scale-95 transition-all cursor-pointer"
+                className="flex items-center justify-center gap-2.5 px-6 py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-sm sm:text-base font-black shadow-lg shadow-indigo-600/30 active:scale-95 transition-all cursor-pointer self-start sm:self-auto"
               >
-                <Camera className="w-4 h-4" />
+                <Camera className="w-5 h-5" />
                 <span>Zrób / Dodaj zdjęcie (+)</span>
               </button>
             </div>
 
-            {/* FORMULARZ DLA BIEŻĄCEGO ZDJĘCIA (JEŚLI WYBRANO) */}
+            {/* FORMULARZ DLA NOWEGO ZDJĘCIA */}
             {isAddingPhoto && tempPhotoUrl && (
-              <div className="p-4 bg-indigo-50/70 dark:bg-indigo-950/40 border-2 border-indigo-200 dark:border-indigo-800 rounded-2xl space-y-3 animate-fade-in">
-                <div className="text-xs font-bold uppercase tracking-wider text-indigo-900 dark:text-indigo-300">
+              <div className="p-5 bg-indigo-50/80 dark:bg-indigo-950/50 border-2 border-indigo-300 dark:border-indigo-800 rounded-3xl space-y-4 animate-fade-in">
+                <div className="text-sm font-black uppercase tracking-wider text-indigo-900 dark:text-indigo-200">
                   Opisz nowo zrobione zdjęcie:
                 </div>
-                <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex flex-col sm:flex-row gap-5">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={tempPhotoUrl}
                     alt="Podgląd zdjęcia"
-                    className="w-full sm:w-48 h-36 object-cover rounded-xl border border-indigo-200 shadow-md"
+                    className="w-full sm:w-56 h-44 object-cover rounded-2xl border-2 border-indigo-200 shadow-md"
                   />
-                  <div className="flex-1 space-y-2">
+                  <div className="flex-1 space-y-3">
                     <div className="flex items-center justify-between">
-                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                        Opis wykonanych prac na zdjęciu:
+                      <label className="text-sm font-extrabold text-slate-800 dark:text-slate-200">
+                        Opis wykonanych prac:
                       </label>
                       <VoiceInputButton
                         onTranscript={(txt) =>
@@ -481,20 +462,20 @@ export function EndShiftForm({
                       value={tempDescription}
                       onChange={(e) => setTempDescription(e.target.value)}
                       placeholder="Wpisz opis elementu lub użyj dyktowania głosem..."
-                      className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-medium text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                      className="w-full p-3.5 bg-white dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 rounded-2xl text-base font-medium text-slate-900 dark:text-white focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none shadow-inner"
                     />
-                    <div className="flex items-center justify-end gap-2 pt-1">
+                    <div className="flex items-center justify-end gap-3 pt-1">
                       <button
                         type="button"
                         onClick={handleCancelAddPhoto}
-                        className="px-3.5 py-1.5 text-xs font-semibold rounded-lg text-slate-600 hover:bg-slate-200 transition-colors"
+                        className="px-4 py-2.5 text-sm font-bold rounded-xl text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer"
                       >
                         Anuluj
                       </button>
                       <button
                         type="button"
                         onClick={handleConfirmAddPhoto}
-                        className="px-4 py-1.5 text-xs font-bold rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 shadow-sm"
+                        className="px-6 py-2.5 text-sm font-black rounded-xl bg-indigo-600 text-white hover:bg-indigo-500 shadow-md cursor-pointer active:scale-95"
                       >
                         Zatwierdź zdjęcie
                       </button>
@@ -506,46 +487,46 @@ export function EndShiftForm({
 
             {/* SIATKA DODANYCH ZDJĘĆ */}
             {photos.length === 0 ? (
-              <div className="p-8 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl text-center space-y-2">
-                <ImageIcon className="w-8 h-8 text-slate-400 mx-auto" />
-                <div className="text-slate-600 dark:text-slate-300 text-xs font-medium">
+              <div className="p-10 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl text-center space-y-3">
+                <ImageIcon className="w-12 h-12 text-slate-400 mx-auto" />
+                <div className="text-slate-800 dark:text-slate-200 text-base font-extrabold">
                   Brak załączonych fotografii.
                 </div>
-                <div className="text-slate-400 text-[11px]">
+                <div className="text-slate-500 text-sm font-medium">
                   Kliknij przycisk „Zrób / Dodaj zdjęcie (+)”, aby uruchomić aparat smartfona/tabletu.
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-1">
                 {photos.map((item, idx) => (
                   <div
                     key={item.id}
-                    className="relative bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden shadow-sm flex flex-col group"
+                    className="relative bg-slate-50 dark:bg-slate-800/70 border-2 border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden shadow-sm flex flex-col group"
                   >
-                    <div className="relative h-44 bg-slate-200 dark:bg-slate-700">
+                    <div className="relative h-52 bg-slate-200 dark:bg-slate-700">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={item.photoDataUrl}
                         alt={`Zdjęcie ${idx + 1}`}
                         className="w-full h-full object-cover"
                       />
-                      <span className="absolute top-2 left-2 px-2 py-1 bg-slate-900/80 text-white text-[10px] font-bold rounded-md backdrop-blur-sm">
+                      <span className="absolute top-3 left-3 px-3 py-1 bg-slate-900/85 text-white text-xs font-black rounded-lg backdrop-blur-sm">
                         Zdjęcie #{idx + 1}
                       </span>
                       <button
                         type="button"
                         onClick={() => handleRemovePhoto(item.id)}
-                        className="absolute top-2 right-2 p-1.5 bg-rose-600 text-white rounded-lg opacity-90 hover:opacity-100 shadow-md active:scale-95 transition-all cursor-pointer"
+                        className="absolute top-3 right-3 p-2 bg-rose-600 text-white rounded-xl opacity-90 hover:opacity-100 shadow-md active:scale-95 transition-all cursor-pointer"
                         title="Usuń zdjęcie"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash2 className="w-5 h-5" />
                       </button>
                     </div>
-                    <div className="p-3 flex-1 flex flex-col justify-between">
-                      <p className="text-xs text-slate-800 dark:text-slate-200 font-medium leading-relaxed">
+                    <div className="p-4 flex-1 flex flex-col justify-between">
+                      <p className="text-sm sm:text-base text-slate-900 dark:text-slate-100 font-bold leading-relaxed">
                         {item.description}
                       </p>
-                      <div className="text-[10px] text-slate-400 mt-2 font-mono">
+                      <div className="text-xs text-slate-400 mt-2 font-mono font-semibold">
                         Godzina: {item.takenAt.slice(11, 16)}
                       </div>
                     </div>
@@ -556,24 +537,24 @@ export function EndShiftForm({
           </div>
 
           {/* GŁÓWNY PRZYCISK: WYŚLIJ RAPORT ZAKOŃCZENIA */}
-          <div className="sticky bottom-4 z-20 pt-2">
+          <div className="sticky bottom-20 md:bottom-6 z-30 pt-2">
             <button
               type="submit"
               disabled={isSubmitting}
-              className={`w-full py-4 px-6 rounded-2xl font-black text-base sm:text-lg shadow-2xl flex items-center justify-center gap-3 transition-all cursor-pointer active:scale-98 ${
+              className={`w-full py-4.5 sm:py-5 px-8 rounded-3xl font-black text-lg sm:text-xl shadow-2xl flex items-center justify-center gap-3.5 transition-all cursor-pointer active:scale-98 border-2 border-white/20 ${
                 isSubmitting
                   ? "bg-slate-700 text-slate-300 cursor-wait"
-                  : "bg-gradient-to-r from-indigo-600 to-slate-900 hover:from-indigo-500 hover:to-slate-800 text-white shadow-indigo-600/30"
+                  : "bg-gradient-to-r from-indigo-600 to-slate-900 hover:from-indigo-500 hover:to-slate-800 text-white shadow-indigo-600/40"
               }`}
             >
               {isSubmitting ? (
                 <>
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <div className="w-6 h-6 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
                   <span>Generowanie i wysyłanie raportu zdaniowego...</span>
                 </>
               ) : (
                 <>
-                  <Send className="w-5 h-5" />
+                  <Send className="w-6 h-6" />
                   <span>Wyślij Raport Zakończenia Prac</span>
                 </>
               )}

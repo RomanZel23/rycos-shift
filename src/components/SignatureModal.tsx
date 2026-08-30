@@ -56,7 +56,7 @@ export function SignatureModal({
       ctx.scale(dpr, dpr);
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
-      ctx.lineWidth = 2.5;
+      ctx.lineWidth = 3.5;
       ctx.strokeStyle = "#0f172a"; // Ciemny granat / navy
     }
   }, []);
@@ -75,14 +75,12 @@ export function SignatureModal({
         setSelectedUserId("");
       }
 
-      // Inicjalizacja po wyrenderowaniu DOM
       setTimeout(() => {
         initCanvas();
       }, 50);
     }
-  }, [isOpen, isForemanModal, preselectedUser, availableUsers, alreadyAddedUserIds]);
+  }, [isOpen, isForemanModal, preselectedUser, availableUsers, alreadyAddedUserIds, initCanvas]);
 
-  // Obsługa zmiany rozmiaru okna
   useEffect(() => {
     const handleResize = () => {
       if (isOpen) initCanvas();
@@ -93,7 +91,6 @@ export function SignatureModal({
 
   if (!isOpen) return null;
 
-  // Wyznacz aktualnie wybranego użytkownika
   const effectiveUserId = isForemanModal
     ? preselectedUser?.id
     : selectedUserId || (selectableWorkers[0]?.id ?? "");
@@ -102,7 +99,7 @@ export function SignatureModal({
     ? preselectedUser
     : availableUsers.find((u) => u.id === effectiveUserId) || selectableWorkers[0];
 
-  // --- RYSOWANIE ZA POMOCĄ POINTER EVENTS (TOUCH, STYLUS, MOUSE) ---
+  // RYSOWANIE
   const getCoordinates = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
@@ -157,7 +154,7 @@ export function SignatureModal({
       try {
         canvas.releasePointerCapture(e.pointerId);
       } catch {
-        // Ignoruj jeśli już zwolniono
+        // ok
       }
     }
     setIsDrawing(false);
@@ -193,7 +190,6 @@ export function SignatureModal({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    // Generuj obraz podpisu PNG
     const signatureDataUrl = canvas.toDataURL("image/png");
 
     const record: AttendanceRecord = {
@@ -212,68 +208,68 @@ export function SignatureModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm animate-fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in"
       onClick={onClose}
     >
       <div
-        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+        className="bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* NAGŁÓWEK OKNA */}
-        <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-sky-500/20 text-sky-400 rounded-lg">
-              <PenTool className="w-5 h-5" />
+        <div className="px-6 py-5 bg-slate-900 text-white flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-sky-500/25 text-sky-400 rounded-xl">
+              <PenTool className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="font-bold text-base text-white">
-                {isForemanModal ? "Podpis Brygadzisty" : "Lista obecności – Podpis pracownika"}
+              <h3 className="font-black text-lg sm:text-xl text-white">
+                {isForemanModal ? "Podpis Brygadzisty" : "Podpis pracownika na liście"}
               </h3>
-              <p className="text-xs text-slate-400">
-                Wymagany czytelny podpis palcem lub rysikiem
+              <p className="text-xs sm:text-sm text-slate-400 font-semibold">
+                Złóż czytelny podpis palcem lub rysikiem
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+            className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors cursor-pointer"
           >
-            <X className="w-5 h-5" />
+            <X className="w-6 h-6" />
           </button>
         </div>
 
         {/* ZAWARTOŚĆ FORMULARZA */}
-        <div className="p-5 space-y-4 overflow-y-auto">
+        <div className="p-5 sm:p-6 space-y-5 overflow-y-auto">
           {/* WYBÓR OSOBY */}
           {isForemanModal ? (
-            <div className="p-3.5 bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800/60 rounded-xl flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-sky-600 text-white flex items-center justify-center font-bold text-sm flex-shrink-0">
+            <div className="p-4 bg-sky-50 dark:bg-sky-950/60 border-2 border-sky-200 dark:border-sky-800 rounded-2xl flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-sky-600 text-white flex items-center justify-center font-black text-lg flex-shrink-0 shadow-md">
                 {currentSelectedUser?.firstName[0]}
                 {currentSelectedUser?.lastName[0]}
               </div>
               <div>
-                <div className="text-xs text-sky-800 dark:text-sky-300 font-semibold uppercase tracking-wider">
+                <div className="text-xs text-sky-800 dark:text-sky-300 font-extrabold uppercase tracking-wider">
                   Brygadzista prowadzący odprawę:
                 </div>
-                <div className="font-bold text-slate-900 dark:text-white text-base">
+                <div className="font-black text-slate-900 dark:text-white text-lg sm:text-xl">
                   {currentSelectedUser
                     ? `${currentSelectedUser.firstName} ${currentSelectedUser.lastName}`
                     : "Nie wybrano brygadzisty"}
                 </div>
-                <div className="text-xs text-slate-600 dark:text-slate-400">
+                <div className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 font-semibold">
                   {currentSelectedUser?.role || "Brygadzista"}
                 </div>
               </div>
             </div>
           ) : (
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+              <label className="block text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-200 mb-2">
                 Wybierz pracownika z listy: <span className="text-rose-500">*</span>
               </label>
               {selectableWorkers.length === 0 ? (
-                <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 text-amber-800 dark:text-amber-300 text-xs rounded-xl flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <div className="p-4 bg-amber-50 dark:bg-amber-950/60 border-2 border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-sm font-bold rounded-2xl flex items-center gap-3">
+                  <AlertCircle className="w-5 h-5 flex-shrink-0 text-amber-600" />
                   <span>Wszyscy dostępni pracownicy zostali już dodani do listy obecności.</span>
                 </div>
               ) : (
@@ -281,7 +277,7 @@ export function SignatureModal({
                   <select
                     value={effectiveUserId}
                     onChange={(e) => setSelectedUserId(e.target.value)}
-                    className="w-full px-3.5 pr-10 py-3 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-semibold text-slate-900 dark:text-white focus:ring-2 focus:ring-sky-500 focus:outline-none appearance-none truncate cursor-pointer"
+                    className="w-full h-14 px-4 pr-12 bg-slate-50 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 rounded-2xl text-base sm:text-lg font-bold text-slate-900 dark:text-white focus:ring-4 focus:ring-sky-500/20 focus:border-sky-500 focus:outline-none appearance-none truncate cursor-pointer shadow-inner"
                   >
                     {selectableWorkers.map((worker) => (
                       <option key={worker.id} value={worker.id}>
@@ -289,32 +285,32 @@ export function SignatureModal({
                       </option>
                     ))}
                   </select>
-                  <UserIcon className="w-4 h-4 text-slate-400 absolute right-3.5 top-3.5 pointer-events-none" />
+                  <UserIcon className="w-5 h-5 text-slate-400 absolute right-4 top-4.5 pointer-events-none" />
                 </div>
               )}
             </div>
           )}
 
-          {/* POLE PODPISU (CANVAS) */}
+          {/* POLE PODPISU (CANVAS) - DUŻA PRZESTRZEŃ */}
           <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm sm:text-base font-extrabold text-slate-800 dark:text-slate-200 flex items-center gap-1">
                 <span>Złóż podpis w ramce poniżej:</span>
                 <span className="text-rose-500">*</span>
               </label>
               <button
                 type="button"
                 onClick={handleClear}
-                className="text-xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 flex items-center gap-1 font-medium cursor-pointer"
+                className="px-3.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs sm:text-sm text-slate-700 dark:text-slate-300 rounded-xl flex items-center gap-1.5 font-bold cursor-pointer transition-colors border border-slate-200 dark:border-slate-700"
               >
-                <RotateCcw className="w-3.5 h-3.5" />
+                <RotateCcw className="w-4 h-4" />
                 Wyczyść
               </button>
             </div>
 
             <div
               ref={containerRef}
-              className="relative border-2 border-dashed border-slate-300 dark:border-slate-700 bg-white rounded-xl overflow-hidden shadow-inner touch-none select-none h-44 sm:h-48"
+              className="relative border-3 border-dashed border-slate-400 dark:border-slate-600 bg-white rounded-2xl overflow-hidden shadow-inner touch-none select-none h-52 sm:h-60"
             >
               <canvas
                 ref={canvasRef}
@@ -327,8 +323,8 @@ export function SignatureModal({
               />
 
               {!hasSignature && (
-                <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center text-slate-400 text-xs gap-1.5 opacity-60">
-                  <PenTool className="w-6 h-6 animate-pulse" />
+                <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center text-slate-400 text-sm sm:text-base gap-2 opacity-60 font-bold">
+                  <PenTool className="w-8 h-8 animate-pulse text-sky-600" />
                   <span>Podpisz palcem lub rysikiem tutaj</span>
                 </div>
               )}
@@ -336,19 +332,19 @@ export function SignatureModal({
           </div>
 
           {errorMsg && (
-            <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl font-medium flex items-center gap-1.5">
-              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            <div className="p-3 bg-rose-50 border-2 border-rose-200 text-rose-800 text-sm rounded-xl font-bold flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 flex-shrink-0" />
               <span>{errorMsg}</span>
             </div>
           )}
         </div>
 
         {/* STOPKA I PRZYCISKI AKCJI */}
-        <div className="px-5 py-4 bg-slate-50 dark:bg-slate-900/80 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end gap-2.5">
+        <div className="px-6 py-4 bg-slate-50 dark:bg-slate-900/80 border-t-2 border-slate-200 dark:border-slate-800 flex items-center justify-end gap-3">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 font-semibold text-sm transition-colors cursor-pointer"
+            className="px-5 py-3.5 rounded-2xl border-2 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 font-bold text-base transition-colors cursor-pointer"
           >
             Anuluj
           </button>
@@ -356,14 +352,14 @@ export function SignatureModal({
             type="button"
             onClick={handleSave}
             disabled={!hasSignature || !currentSelectedUser}
-            className={`flex items-center gap-1.5 px-6 py-2.5 rounded-xl font-bold text-sm shadow-md transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-8 py-3.5 rounded-2xl font-black text-base sm:text-lg shadow-xl transition-all cursor-pointer ${
               hasSignature && currentSelectedUser
-                ? "bg-sky-600 hover:bg-sky-500 text-white shadow-sky-600/25 active:scale-95"
+                ? "bg-sky-600 hover:bg-sky-500 text-white shadow-sky-600/30 active:scale-95"
                 : "bg-slate-300 text-slate-500 dark:bg-slate-800 dark:text-slate-600 cursor-not-allowed opacity-60 shadow-none"
             }`}
           >
-            <Check className="w-4 h-4" />
-            OK (Zatwierdź podpis)
+            <Check className="w-5 h-5" />
+            Zatwierdź podpis (OK)
           </button>
         </div>
       </div>

@@ -9,7 +9,6 @@ interface VoiceInputButtonProps {
   placeholderText?: string;
 }
 
-// Typy dla Web Speech API
 interface SpeechRecognitionEvent extends Event {
   results: {
     [index: number]: {
@@ -83,7 +82,6 @@ export function VoiceInputButton({
     e.stopPropagation();
 
     if (!supported) {
-      // Fallback dialog if Web Speech API isn't enabled
       const text = prompt("Wprowadzanie głosowe nie jest wspierane w tej przeglądarce. Wpisz tekst:");
       if (text) onTranscript(text.trim());
       return;
@@ -108,34 +106,34 @@ export function VoiceInputButton({
       <button
         type="button"
         onClick={toggleListening}
-        className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer select-none active:scale-95 ${
+        className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold transition-all cursor-pointer select-none active:scale-95 shadow-sm ${
           isListening
             ? "bg-rose-600 text-white shadow-lg shadow-rose-500/30 animate-pulse"
-            : "bg-sky-50 text-sky-700 hover:bg-sky-100 dark:bg-sky-950/60 dark:text-sky-300 dark:hover:bg-sky-900/60 border border-sky-200 dark:border-sky-800"
+            : "bg-sky-100 text-sky-900 hover:bg-sky-200 dark:bg-sky-950 dark:text-sky-200 dark:hover:bg-sky-900 border-2 border-sky-300 dark:border-sky-700"
         } ${className}`}
         title={isListening ? "Zatrzymaj dyktowanie" : "Dyktuj głosem (polski)"}
       >
         {isListening ? (
           <>
-            <span className="relative flex h-2 w-2">
+            <span className="relative flex h-2.5 w-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white"></span>
             </span>
-            <MicOff className="w-3.5 h-3.5" />
+            <MicOff className="w-4 h-4" />
             <span>Słucham...</span>
           </>
         ) : (
           <>
-            <Mic className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
-            <span>Powiedz</span>
+            <Mic className="w-4 h-4 text-sky-700 dark:text-sky-300" />
+            <span>Dyktuj głosem</span>
           </>
         )}
       </button>
 
       {isListening && (
-        <div className="absolute left-0 -top-9 bg-slate-900 text-white text-[11px] px-2.5 py-1 rounded-md shadow-lg flex items-center gap-1.5 whitespace-nowrap z-30 animate-fade-in">
-          <Volume2 className="w-3 h-3 text-sky-400 animate-bounce" />
-          <span>{placeholderText}</span>
+        <div className="absolute left-0 -top-11 bg-slate-900 text-white text-xs px-3.5 py-1.5 rounded-xl shadow-2xl flex items-center gap-2 whitespace-nowrap z-30 animate-fade-in border border-slate-700">
+          <Volume2 className="w-4 h-4 text-sky-400 animate-bounce" />
+          <span className="font-semibold">{placeholderText}</span>
         </div>
       )}
     </div>

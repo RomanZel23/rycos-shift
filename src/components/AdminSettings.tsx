@@ -200,7 +200,7 @@ export function AdminSettings({
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto space-y-5 pb-16">
+    <div className="w-full max-w-5xl mx-auto space-y-6 pb-32 md:pb-20">
       {/* NAGŁÓWEK PANELU ADMINA */}
       <div className="bg-slate-900 text-white rounded-2xl p-5 sm:p-6 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
