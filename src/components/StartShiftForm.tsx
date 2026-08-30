@@ -31,6 +31,7 @@ import { SignatureModal } from "./SignatureModal";
 import { AddTopicModal } from "./AddTopicModal";
 import { generateReportPDFAsync } from "@/lib/pdf-generator";
 import { saveStoredReport } from "@/lib/storage";
+import { getPolishCurrentDate, getPolishCurrentTime } from "@/lib/date-utils";
 
 interface StartShiftFormProps {
   sites: ConstructionSite[];
@@ -81,11 +82,8 @@ export function StartShiftForm({
 
   // Inicjalizacja daty, godziny, domyślnego placu i brygadzisty
   useEffect(() => {
-    const now = new Date();
-    const formattedDate = now.toISOString().split("T")[0];
-    const formattedTime = now.toTimeString().slice(0, 5);
-    setDate(formattedDate);
-    setTime(formattedTime);
+    setDate(getPolishCurrentDate());
+    setTime(getPolishCurrentTime());
 
     if (sites.length > 0 && !siteId) {
       setSiteId(sites[0].id);
@@ -229,9 +227,8 @@ export function StartShiftForm({
     setSuccessReport(null);
     setAttendanceList([]);
     setDiscussedTopics(["Szkolenie BHP i instruktaż stanowiskowy przed rozpoczęciem prac"]);
-    const now = new Date();
-    setDate(now.toISOString().split("T")[0]);
-    setTime(now.toTimeString().slice(0, 5));
+    setDate(getPolishCurrentDate());
+    setTime(getPolishCurrentTime());
   };
 
   const handleDownloadPDF = async () => {

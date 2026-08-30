@@ -1,4 +1,5 @@
 import { DailyReport, TenantSettings } from "@/types";
+import { formatPolishTime, formatPolishDateTime } from "./date-utils";
 
 /**
  * Szablon HTML dla Raportu Rozpoczęcia Prac (Start Shift)
@@ -44,9 +45,9 @@ export function generateStartShiftHtml(report: DailyReport, settings?: TenantSet
         <td style="padding: 10px 12px; font-size: 12px; color: #334155;">${escapeHtml(
           att.userRole
         )}</td>
-        <td style="padding: 10px 12px; font-size: 12px; color: #64748b; font-family: monospace; text-align: center;">${
-          att.signedAt ? att.signedAt.slice(11, 16) : report.time
-        }</td>
+        <td style="padding: 10px 12px; font-size: 12px; color: #64748b; font-family: monospace; text-align: center;">${formatPolishTime(
+          att.signedAt || report.time
+        )}</td>
         <td style="padding: 6px 12px; text-align: center; width: 140px;">
           <div style="background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 2px; height: 42px; display: flex; align-items: center; justify-content: center;">
             <img src="${
@@ -158,7 +159,7 @@ export function generateStartShiftHtml(report: DailyReport, settings?: TenantSet
         <div style="font-size: 12px; font-weight: 800; color: #0f172a; letter-spacing: 1px;">[Koniec raportu]</div>
         <div style="font-size: 10px; color: #64748b; margin-top: 4px;">Dokument wygenerowany automatycznie w systemie ${escapeHtml(
           orgName
-        )} • Data wygenerowania: ${new Date().toLocaleString("pl-PL")}</div>
+        )} • Data wygenerowania: ${formatPolishDateTime()}</div>
       </div>
 
     </div>
@@ -189,9 +190,9 @@ export function generateEndShiftHtml(report: DailyReport, settings?: TenantSetti
           <div style="font-size: 12px; font-weight: 700; color: #1e293b; line-height: 1.4;">${escapeHtml(
             photo.description
           )}</div>
-          <div style="font-size: 10px; color: #64748b; font-family: monospace; margin-top: 8px;">Wykonano: ${
-            photo.takenAt ? photo.takenAt.slice(11, 16) : report.time
-          }</div>
+          <div style="font-size: 10px; color: #64748b; font-family: monospace; margin-top: 8px;">Wykonano: ${formatPolishTime(
+            photo.takenAt || report.time
+          )}</div>
         </div>
       </div>
     `
@@ -279,7 +280,7 @@ export function generateEndShiftHtml(report: DailyReport, settings?: TenantSetti
         <div style="font-size: 12px; font-weight: 800; color: #0f172a; letter-spacing: 1px;">[Koniec raportu]</div>
         <div style="font-size: 10px; color: #64748b; margin-top: 4px;">Dokument wygenerowany automatycznie w systemie ${escapeHtml(
           orgName
-        )} • Data wygenerowania: ${new Date().toLocaleString("pl-PL")}</div>
+        )} • Data wygenerowania: ${formatPolishDateTime()}</div>
       </div>
 
     </div>

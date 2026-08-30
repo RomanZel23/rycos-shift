@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { DailyReport } from "@/types";
 import { generateReportPDFAsync } from "@/lib/pdf-generator";
+import { formatPolishTime } from "@/lib/date-utils";
 
 interface ReportArchiveProps {
   reports: DailyReport[];
@@ -171,7 +172,7 @@ export function ReportArchive({
                   <div className="flex items-center gap-1.5 text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-mono font-bold">
                     <Calendar className="w-4 h-4" />
                     <span>
-                      {report.date} | {report.time}
+                      {report.date} | {formatPolishTime(report.time)}
                     </span>
                   </div>
                   <span className="inline-flex items-center text-xs text-emerald-600 font-extrabold bg-emerald-100 dark:bg-emerald-950 px-2.5 py-0.5 rounded-lg">
@@ -326,7 +327,9 @@ export function ReportArchive({
                           <div className="font-bold text-slate-900 dark:text-white text-sm">
                             {att.userName}
                           </div>
-                          <div className="text-xs text-slate-500">{att.userRole}</div>
+                          <div className="text-xs text-slate-500 font-mono font-bold">
+                            {att.userRole} • {formatPolishTime(att.signedAt || previewReport.time)}
+                          </div>
                         </div>
                         <div className="bg-white border-2 border-slate-300 rounded-xl p-1 w-28 h-10 flex items-center justify-center overflow-hidden">
                           {/* eslint-disable-next-line @next/next/no-img-element */}

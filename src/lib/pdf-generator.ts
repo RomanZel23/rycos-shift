@@ -3,6 +3,7 @@ import autoTable from "jspdf-autotable";
 import html2canvas from "html2canvas";
 import { DailyReport, TenantSettings } from "@/types";
 import { generateStartShiftHtml, generateEndShiftHtml } from "./pdf-html-templates";
+import { formatPolishTime } from "./date-utils";
 
 export interface PDFGenerationResult {
   fileName: string;
@@ -234,7 +235,7 @@ export function generateReportPDF(report: DailyReport): PDFGenerationResult {
       String(i + 1),
       cleanPolishChars(att.userName) + (att.isForeman ? " (Brygadzista)" : ""),
       cleanPolishChars(att.userRole) || "Pracownik",
-      att.signedAt ? att.signedAt.slice(11, 16) : report.time,
+      formatPolishTime(att.signedAt || report.time),
       "",
     ]);
 

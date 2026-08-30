@@ -28,6 +28,7 @@ import { GeoLocationBadge } from "./GeoLocationBadge";
 import { VoiceInputButton } from "./VoiceInputButton";
 import { generateReportPDFAsync } from "@/lib/pdf-generator";
 import { saveStoredReport } from "@/lib/storage";
+import { getPolishCurrentDate, getPolishCurrentTime } from "@/lib/date-utils";
 
 interface EndShiftFormProps {
   sites: ConstructionSite[];
@@ -67,11 +68,8 @@ export function EndShiftForm({
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
 
   useEffect(() => {
-    const now = new Date();
-    const formattedDate = now.toISOString().split("T")[0];
-    const formattedTime = now.toTimeString().slice(0, 5);
-    setDate(formattedDate);
-    setTime(formattedTime);
+    setDate(getPolishCurrentDate());
+    setTime(getPolishCurrentTime());
 
     if (sites.length > 0 && !siteId) {
       setSiteId(sites[0].id);
@@ -241,9 +239,8 @@ export function EndShiftForm({
   const resetForm = () => {
     setSuccessReport(null);
     setPhotos([]);
-    const now = new Date();
-    setDate(now.toISOString().split("T")[0]);
-    setTime(now.toTimeString().slice(0, 5));
+    setDate(getPolishCurrentDate());
+    setTime(getPolishCurrentTime());
   };
 
   const handleDownloadPDF = async () => {
