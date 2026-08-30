@@ -1,4 +1,4 @@
-import { ConstructionSite, DiscussedTopicTemplate, User, TenantSettings, DailyReport } from "@/types";
+import { ConstructionSite, DiscussedTopicTemplate, User, TenantSettings, DailyReport, PdfTemplate } from "@/types";
 
 export const INITIAL_USERS: User[] = [
   {
@@ -169,6 +169,27 @@ export const INITIAL_SETTINGS: TenantSettings = {
   storageFolder: "Raporty_RYCOS_Shift_Poznan",
 };
 
+export const INITIAL_PDF_TEMPLATES: PdfTemplate[] = [
+  {
+    id: "tpl-start-shift-sb",
+    tenantId: "tenant-sb-tech-poznan",
+    reportType: "START_SHIFT",
+    name: "Szablon Rozpoczęcia Prac SB Technology",
+    htmlContent: "DEFAULT_HTML_START_SHIFT",
+    active: true,
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: "tpl-end-shift-sb",
+    tenantId: "tenant-sb-tech-poznan",
+    reportType: "END_SHIFT",
+    name: "Szablon Zakończenia Prac SB Technology",
+    htmlContent: "DEFAULT_HTML_END_SHIFT",
+    active: true,
+    updatedAt: new Date().toISOString(),
+  },
+];
+
 // Klucze LocalStorage dla trwałości danych w przeglądarce
 const STORAGE_KEYS = {
   USERS: "rycos_shift_users_v1",
@@ -176,6 +197,7 @@ const STORAGE_KEYS = {
   TOPICS: "rycos_shift_topics_v1",
   SETTINGS: "rycos_shift_settings_v1",
   REPORTS: "rycos_shift_reports_v1",
+  TEMPLATES: "rycos_shift_templates_v1",
   CURRENT_USER_ID: "rycos_shift_current_user_v1",
 };
 
@@ -312,4 +334,23 @@ export const getStoredCurrentUserId = (): string => {
 export const setStoredCurrentUserId = (userId: string): void => {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, userId);
+};
+
+export const getStoredPdfTemplates = (): PdfTemplate[] => {
+  if (typeof window === "undefined") return INITIAL_PDF_TEMPLATES;
+  try {
+    const data = localStorage.getItem(STORAGE_KEYS.TEMPLATES);
+    if (!data) {
+      localStorage.setItem(STORAGE_KEYS.TEMPLATES, JSON.stringify(INITIAL_PDF_TEMPLATES));
+      return INITIAL_PDF_TEMPLATES;
+    }
+    return JSON.parse(data);
+  } catch {
+    return INITIAL_PDF_TEMPLATES;
+  }
+};
+
+export const saveStoredPdfTemplates = (templates: PdfTemplate[]): void => {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(STORAGE_KEYS.TEMPLATES, JSON.stringify(templates));
 };

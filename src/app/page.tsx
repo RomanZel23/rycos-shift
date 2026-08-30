@@ -12,6 +12,7 @@ import {
   DiscussedTopicTemplate,
   TenantSettings,
   DailyReport,
+  PdfTemplate,
 } from "@/types";
 import {
   getStoredUsers,
@@ -25,6 +26,9 @@ import {
   getStoredReports,
   getStoredCurrentUserId,
   setStoredCurrentUserId,
+  getStoredPdfTemplates,
+  saveStoredPdfTemplates,
+  INITIAL_PDF_TEMPLATES,
 } from "@/lib/storage";
 
 export default function Home() {
@@ -44,6 +48,7 @@ export default function Home() {
     endShiftEmailRecipients: ["raporty-koniec@solutionsbay.pl"],
   });
   const [reports, setReports] = useState<DailyReport[]>([]);
+  const [pdfTemplates, setPdfTemplates] = useState<PdfTemplate[]>(INITIAL_PDF_TEMPLATES);
   const [currentUserId, setCurrentUserId] = useState<string>("");
 
   // Inicjalizacja z localStorage
@@ -53,6 +58,7 @@ export default function Home() {
     const loadedTopics = getStoredTopics();
     const loadedSettings = getStoredSettings();
     const loadedReports = getStoredReports();
+    const loadedTemplates = getStoredPdfTemplates();
     const loadedCurrentUserId = getStoredCurrentUserId();
 
     setUsers(loadedUsers);
@@ -60,6 +66,7 @@ export default function Home() {
     setTopics(loadedTopics);
     setSettings(loadedSettings);
     setReports(loadedReports);
+    setPdfTemplates(loadedTemplates);
     setCurrentUserId(loadedCurrentUserId);
 
     setMounted(true);
@@ -70,7 +77,14 @@ export default function Home() {
         const res = await fetch("/api/db/sync");
         const resJson = await res.json();
         if (resJson.success && resJson.isConnected && resJson.data) {
-          const { users: dbUsers, sites: dbSites, topics: dbTopics, settings: dbSettings, reports: dbReports } = resJson.data;
+          const {
+            users: dbUsers,
+            sites: dbSites,
+            topics: dbTopics,
+            settings: dbSettings,
+            reports: dbReports,
+            pdfTemplates: dbTemplates,
+          } = resJson.data;
           if (dbUsers && dbUsers.length > 0) {
             setUsers(dbUsers);
             saveStoredUsers(dbUsers);
@@ -90,6 +104,10 @@ export default function Home() {
           if (dbReports && dbReports.length > 0) {
             setReports(dbReports);
             localStorage.setItem("rycos_shift_reports_v1", JSON.stringify(dbReports));
+          }
+          if (dbTemplates && dbTemplates.length > 0) {
+            setPdfTemplates(dbTemplates);
+            saveStoredPdfTemplates(dbTemplates);
           }
         }
       } catch (err) {
@@ -163,6 +181,16 @@ export default function Home() {
     }).catch(() => {});
   };
 
+  const handleUpdatePdfTemplates = (updated: PdfTemplate[]) => {
+    setPdfTemplates(updated);
+    saveStoredPdfTemplates(updated);
+    fetch("/api/db/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "SYNC_PDF_TEMPLATES", pdfTemplates: updated }),
+    }).catch(() => {});
+  };
+
   const handleReportCreated = (newReport: DailyReport) => {
     setReports((prev) => [newReport, ...prev]);
     fetch("/api/db/sync", {
@@ -232,10 +260,12 @@ export default function Home() {
             sites={sites}
             topicTemplates={topics}
             settings={settings}
+            pdfTemplates={pdfTemplates}
             onUpdateUsers={handleUpdateUsers}
             onUpdateSites={handleUpdateSites}
             onUpdateTopics={handleUpdateTopics}
             onUpdateSettings={handleUpdateSettings}
+            onUpdatePdfTemplates={handleUpdatePdfTemplates}
           />
         )}
       </main>

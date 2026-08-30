@@ -69,6 +69,18 @@ CREATE TABLE IF NOT EXISTS public.tenant_settings (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- 6. Tabela Szablonów HTML dla Raportów PDF
+CREATE TABLE IF NOT EXISTS public.pdf_templates (
+    id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL DEFAULT 'tenant-sb-tech-poznan',
+    report_type TEXT NOT NULL, -- 'START_SHIFT' lub 'END_SHIFT'
+    name TEXT NOT NULL,
+    html_content TEXT NOT NULL,
+    active BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- ==============================================================================
 -- INICJALNE DANE STARTOWE (SEED DATA)
 -- ==============================================================================
@@ -117,15 +129,24 @@ VALUES
   ('tenant-sb-tech-poznan', 'SolutionsBay / SB Technology', 'SB Technology', 'RYCOS Shift workflow', '["raporty-start@solutionsbay.pl", "kierownik.budowy@solutionsbay.pl"]'::jsonb, '["raporty-koniec@solutionsbay.pl", "kierownik.budowy@solutionsbay.pl", "zarzad@solutionsbay.pl"]'::jsonb, 'raporty@shift.rycos.eu')
 ON CONFLICT (tenant_id) DO NOTHING;
 
--- Uprawnienia do odczytu/zapisu (Row Level Security - domyślnie otwarte dla aplikacji z kluczem anon/service)
+-- Inicjalne Szablony HTML PDF
+INSERT INTO public.pdf_templates (id, tenant_id, report_type, name, html_content, active)
+VALUES
+  ('tpl-start-shift-sb', 'tenant-sb-tech-poznan', 'START_SHIFT', 'Szablon Rozpoczęcia Prac SB Technology', 'DEFAULT_HTML_START_SHIFT', true),
+  ('tpl-end-shift-sb', 'tenant-sb-tech-poznan', 'END_SHIFT', 'Szablon Zakończenia Prac SB Technology', 'DEFAULT_HTML_END_SHIFT', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Uprawnienia do odczytu/zapisu (Row Level Security)
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.construction_sites ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.topic_templates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.daily_reports ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tenant_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.pdf_templates ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow anon read/write users" ON public.users FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow anon read/write sites" ON public.construction_sites FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow anon read/write topics" ON public.topic_templates FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow anon read/write reports" ON public.daily_reports FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow anon read/write settings" ON public.tenant_settings FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow anon read/write templates" ON public.pdf_templates FOR ALL USING (true) WITH CHECK (true);

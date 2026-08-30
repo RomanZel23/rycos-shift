@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseClient, isSupabaseConfigured } from "@/lib/supabase";
-import { User, ConstructionSite, DiscussedTopicTemplate, TenantSettings, DailyReport } from "@/types";
+import { User, ConstructionSite, DiscussedTopicTemplate, TenantSettings, DailyReport, PdfTemplate } from "@/types";
 
 export async function GET() {
   try {
@@ -18,12 +18,13 @@ export async function GET() {
     }
 
     // Pobierz dane z tabel Supabase równolegle
-    const [usersRes, sitesRes, topicsRes, settingsRes, reportsRes] = await Promise.all([
+    const [usersRes, sitesRes, topicsRes, settingsRes, reportsRes, templatesRes] = await Promise.all([
       supabase.from("users").select("*").order("created_at", { ascending: true }),
       supabase.from("construction_sites").select("*").order("name", { ascending: true }),
       supabase.from("topic_templates").select("*").order("created_at", { ascending: true }),
       supabase.from("tenant_settings").select("*").limit(1).maybeSingle(),
       supabase.from("daily_reports").select("*").order("created_at", { ascending: false }),
+      supabase.from("pdf_templates").select("*").order("created_at", { ascending: true }),
     ]);
 
     // Mapowanie tabeli users
@@ -90,6 +91,17 @@ export async function GET() {
       status: row.status,
     }));
 
+    // Mapowanie szablonów PDF
+    const pdfTemplates: PdfTemplate[] = (templatesRes.data || []).map((row) => ({
+      id: row.id,
+      tenantId: row.tenant_id,
+      reportType: row.report_type,
+      name: row.name,
+      htmlContent: row.html_content,
+      active: row.active,
+      updatedAt: row.updated_at,
+    }));
+
     return NextResponse.json({
       success: true,
       isConnected: true,
@@ -99,6 +111,7 @@ export async function GET() {
         topics: topics.length > 0 ? topics : null,
         settings,
         reports,
+        pdfTemplates,
       },
     });
   } catch (err: unknown) {
@@ -124,7 +137,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { action, report, users, sites, topics, settings } = body;
+    const { action, report, users, sites, topics, settings, pdfTemplates } = body;
 
     // 1. Zapis/Aktualizacja nowego raportu dziennego
     if (action === "SAVE_REPORT" && report) {
@@ -213,6 +226,21 @@ export async function POST(req: NextRequest) {
         },
         { onConflict: "tenant_id" }
       );
+      return NextResponse.json({ success: true });
+    }
+
+    // 6. Zapis/Synchronizacja Szablonów PDF (HTML)
+    if (action === "SYNC_PDF_TEMPLATES" && pdfTemplates) {
+      const mapped = pdfTemplates.map((t: PdfTemplate) => ({
+        id: t.id,
+        tenant_id: t.tenantId || "tenant-sb-tech-poznan",
+        report_type: t.reportType,
+        name: t.name,
+        html_content: t.htmlContent,
+        active: t.active !== undefined ? t.active : true,
+        updated_at: new Date().toISOString(),
+      }));
+      await supabase.from("pdf_templates").upsert(mapped, { onConflict: "id" });
       return NextResponse.json({ success: true });
     }
 

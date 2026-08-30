@@ -78,3 +78,16 @@ model TenantSettings {
 
   @@map("tenant_settings")
 }
+
+model PdfTemplate {
+  id          String   @id @default(cuid())
+  tenantId    String   @default("tenant-sb-tech-poznan") @map("tenant_id")
+  reportType  String   @map("report_type") // 'START_SHIFT' | 'END_SHIFT'
+  name        String
+  htmlContent String   @map("html_content")
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("pdf_templates")
+}

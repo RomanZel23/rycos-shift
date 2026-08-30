@@ -14,23 +14,30 @@ import {
   Key,
   Layers,
   Save,
+  FileCode,
+  RotateCcw,
+  Sparkles,
 } from "lucide-react";
 import {
   User,
   ConstructionSite,
   DiscussedTopicTemplate,
   TenantSettings,
+  PdfTemplate,
 } from "@/types";
+import { INITIAL_PDF_TEMPLATES } from "@/lib/storage";
 
 interface AdminSettingsProps {
   users: User[];
   sites: ConstructionSite[];
   topicTemplates: DiscussedTopicTemplate[];
   settings: TenantSettings;
+  pdfTemplates?: PdfTemplate[];
   onUpdateUsers: (users: User[]) => void;
   onUpdateSites: (sites: ConstructionSite[]) => void;
   onUpdateTopics: (topics: DiscussedTopicTemplate[]) => void;
   onUpdateSettings: (settings: TenantSettings) => void;
+  onUpdatePdfTemplates?: (templates: PdfTemplate[]) => void;
 }
 
 export function AdminSettings({
@@ -38,13 +45,15 @@ export function AdminSettings({
   sites,
   topicTemplates,
   settings,
+  pdfTemplates = INITIAL_PDF_TEMPLATES,
   onUpdateUsers,
   onUpdateSites,
   onUpdateTopics,
   onUpdateSettings,
+  onUpdatePdfTemplates,
 }: AdminSettingsProps) {
   const [activeSubTab, setActiveSubTab] = useState<
-    "users" | "sites" | "topics" | "emails" | "tenant"
+    "users" | "sites" | "topics" | "emails" | "tenant" | "templates"
   >("users");
 
   // Stan nowego użytkownika
@@ -75,11 +84,23 @@ export function AdminSettings({
   );
   const [resendApiKey, setResendApiKey] = useState(settings.resendApiKey || "");
   const [resendFromEmail, setResendFromEmail] = useState(
-    settings.resendFromEmail || "raporty@solutionsbay.pl"
+    settings.resendFromEmail || "raporty@shift.rycos.eu"
   );
   const [orgName, setOrgName] = useState(settings.organizationName);
   const [logoText, setLogoText] = useState(settings.logoText);
+
+  // Stan edytora szablonów PDF
+  const [selectedTemplateType, setSelectedTemplateType] = useState<"START_SHIFT" | "END_SHIFT">("START_SHIFT");
+  const currentTemplate = pdfTemplates.find((t) => t.reportType === selectedTemplateType) || pdfTemplates[0];
+  const [templateCode, setTemplateCode] = useState(currentTemplate?.htmlContent || "");
+
+  // Komunikat potwierdzenia zapisu
   const [saveBanner, setSaveBanner] = useState<string | null>(null);
+
+  const triggerSaveBanner = (msg: string) => {
+    setSaveBanner(msg);
+    setTimeout(() => setSaveBanner(null), 3000);
+  };
 
   // --- OBSŁUGA UŻYTKOWNIKÓW ---
   const handleAddUser = (e: React.FormEvent) => {
@@ -111,7 +132,7 @@ export function AdminSettings({
       login: "",
       password: "",
     });
-    triggerSaveBanner("Użytkownik został pomyślnie dodany.");
+    triggerSaveBanner("Użytkownik został pomyślnie dodany i zapisany w Supabase.");
   };
 
   const handleDeleteUser = (userId: string) => {
@@ -139,7 +160,7 @@ export function AdminSettings({
     onUpdateSites([...sites, created]);
     setNewSiteName("");
     setNewSiteAddress("");
-    triggerSaveBanner("Plac budowy został dodany.");
+    triggerSaveBanner("Plac budowy został dodany i zapisany w Supabase.");
   };
 
   const handleDeleteSite = (siteId: string) => {
@@ -164,7 +185,7 @@ export function AdminSettings({
 
     onUpdateTopics([...topicTemplates, created]);
     setNewTopicTitle("");
-    triggerSaveBanner("Szablon tematu odprawy został dodany.");
+    triggerSaveBanner("Szablon tematu odprawy został dodany i zapisany w Supabase.");
   };
 
   const handleDeleteTopic = (topicId: string) => {
@@ -172,67 +193,83 @@ export function AdminSettings({
     triggerSaveBanner("Szablon tematu został usunięty.");
   };
 
-  // --- ZAPIS USTAWIEŃ MAILINGOWYCH I INSTANCJI ---
+  // --- ZAPIS USTAWIEŃ MAILINGOWYCH & INSTANCJI ---
   const handleSaveSettings = () => {
-    const parseEmails = (str: string) =>
-      str
-        .split(",")
-        .map((s) => s.trim())
-        .filter((s) => s.length > 0);
+    const startList = startEmails
+      .split(",")
+      .map((e) => e.trim())
+      .filter((e) => e.length > 0);
+    const endList = endEmails
+      .split(",")
+      .map((e) => e.trim())
+      .filter((e) => e.length > 0);
 
-    const updated: TenantSettings = {
+    const updatedSettings: TenantSettings = {
       ...settings,
-      organizationName: orgName.trim() || "SolutionsBay / SB Technology",
-      logoText: logoText.trim() || "SB Technology",
-      startShiftEmailRecipients: parseEmails(startEmails),
-      endShiftEmailRecipients: parseEmails(endEmails),
+      organizationName: orgName.trim() || settings.organizationName,
+      logoText: logoText.trim() || settings.logoText,
+      startShiftEmailRecipients: startList,
+      endShiftEmailRecipients: endList,
       resendApiKey: resendApiKey.trim(),
-      resendFromEmail: resendFromEmail.trim(),
+      resendFromEmail: resendFromEmail.trim() || "raporty@shift.rycos.eu",
     };
 
-    onUpdateSettings(updated);
-    triggerSaveBanner("Ustawienia zostały zapisane.");
+    onUpdateSettings(updatedSettings);
+    triggerSaveBanner("Konfiguracja instancji i e-mail została zsynchronizowana z Supabase.");
   };
 
-  const triggerSaveBanner = (msg: string) => {
-    setSaveBanner(msg);
-    setTimeout(() => setSaveBanner(null), 3000);
+  // --- ZAPIS SZABLONU PDF ---
+  const handleSaveTemplate = () => {
+    if (!onUpdatePdfTemplates) return;
+    const updated = pdfTemplates.map((t) => {
+      if (t.reportType === selectedTemplateType) {
+        return {
+          ...t,
+          htmlContent: templateCode,
+          updatedAt: new Date().toISOString(),
+        };
+      }
+      return t;
+    });
+
+    onUpdatePdfTemplates(updated);
+    triggerSaveBanner("Szablon raportu PDF (HTML) został zapisany w bazie danych Supabase!");
   };
 
   return (
     <div className="w-full max-w-5xl mx-auto space-y-6 pb-32 md:pb-20">
       {/* NAGŁÓWEK PANELU ADMINA */}
-      <div className="bg-slate-900 text-white rounded-2xl p-5 sm:p-6 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-5 border border-slate-800">
         <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs font-semibold uppercase tracking-wider mb-2 border border-amber-500/30">
-            <Shield className="w-3.5 h-3.5" />
-            <span>Panel Administracyjny</span>
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/25 text-amber-300 text-xs sm:text-sm font-black uppercase tracking-wider mb-2.5 border border-amber-500/40">
+            <Shield className="w-4 h-4" />
+            <span>Panel Administracyjny & Baza Danych</span>
           </div>
-          <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white">
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
             Ustawienia Systemu RYCOS Shift
           </h1>
-          <p className="text-xs sm:text-sm text-slate-300 mt-0.5">
-            Zarządzanie pracownikami, placami budów, tematami BHP, listami e-mail i instancjami
+          <p className="text-sm sm:text-base text-slate-300 mt-1 font-medium">
+            Zarządzanie pracownikami, placami budów, tematami BHP, listami e-mail, instancjami i szablonami HTML
           </p>
         </div>
       </div>
 
       {saveBanner && (
-        <div className="p-4 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 rounded-xl text-emerald-800 dark:text-emerald-300 text-sm font-semibold flex items-center gap-2 animate-fade-in">
-          <Check className="w-5 h-5 text-emerald-600" />
+        <div className="p-4 sm:p-5 bg-emerald-50 dark:bg-emerald-950/70 border-2 border-emerald-300 dark:border-emerald-800 rounded-2xl text-emerald-900 dark:text-emerald-100 text-sm sm:text-base font-bold flex items-center gap-3 animate-fade-in shadow-md">
+          <Check className="w-6 h-6 text-emerald-600 flex-shrink-0" />
           <span>{saveBanner}</span>
         </div>
       )}
 
       {/* ZAKŁADKI PODRZĘDNE W USTAWIENIACH */}
-      <div className="flex flex-wrap gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
+      <div className="flex flex-wrap gap-2.5 border-b border-slate-200 dark:border-slate-800 pb-3">
         <button
           type="button"
           onClick={() => setActiveSubTab("users")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+          className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
             activeSubTab === "users"
-              ? "bg-slate-900 text-white shadow-md"
-              : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100"
+              ? "bg-slate-900 text-white shadow-md shadow-slate-900/30"
+              : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 border border-slate-200 dark:border-slate-800"
           }`}
         >
           <Users className="w-4 h-4" />
@@ -242,10 +279,10 @@ export function AdminSettings({
         <button
           type="button"
           onClick={() => setActiveSubTab("sites")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+          className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
             activeSubTab === "sites"
-              ? "bg-slate-900 text-white shadow-md"
-              : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100"
+              ? "bg-slate-900 text-white shadow-md shadow-slate-900/30"
+              : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 border border-slate-200 dark:border-slate-800"
           }`}
         >
           <Building2 className="w-4 h-4" />
@@ -255,10 +292,10 @@ export function AdminSettings({
         <button
           type="button"
           onClick={() => setActiveSubTab("topics")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+          className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
             activeSubTab === "topics"
-              ? "bg-slate-900 text-white shadow-md"
-              : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100"
+              ? "bg-slate-900 text-white shadow-md shadow-slate-900/30"
+              : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 border border-slate-200 dark:border-slate-800"
           }`}
         >
           <ListFilter className="w-4 h-4" />
@@ -268,10 +305,10 @@ export function AdminSettings({
         <button
           type="button"
           onClick={() => setActiveSubTab("emails")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+          className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
             activeSubTab === "emails"
-              ? "bg-slate-900 text-white shadow-md"
-              : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100"
+              ? "bg-slate-900 text-white shadow-md shadow-slate-900/30"
+              : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 border border-slate-200 dark:border-slate-800"
           }`}
         >
           <Mail className="w-4 h-4" />
@@ -280,11 +317,24 @@ export function AdminSettings({
 
         <button
           type="button"
+          onClick={() => setActiveSubTab("templates")}
+          className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+            activeSubTab === "templates"
+              ? "bg-sky-600 text-white shadow-md shadow-sky-600/30 font-black"
+              : "bg-white dark:bg-slate-900 text-sky-700 dark:text-sky-300 hover:bg-sky-50 border border-sky-200 dark:border-sky-800"
+          }`}
+        >
+          <FileCode className="w-4 h-4" />
+          <span>Szablony PDF (HTML Baza)</span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => setActiveSubTab("tenant")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+          className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
             activeSubTab === "tenant"
-              ? "bg-slate-900 text-white shadow-md"
-              : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100"
+              ? "bg-slate-900 text-white shadow-md shadow-slate-900/30"
+              : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 border border-slate-200 dark:border-slate-800"
           }`}
         >
           <Layers className="w-4 h-4" />
@@ -295,175 +345,141 @@ export function AdminSettings({
       {/* 1. ZAKŁADKA UŻYTKOWNIKÓW */}
       {activeSubTab === "users" && (
         <div className="space-y-6">
-          {/* FORMULARZ DODAWANIA NOWEGO UŻYTKOWNIKA */}
           <form
             onSubmit={handleAddUser}
-            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4"
+            className="bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 rounded-3xl p-5 sm:p-7 shadow-sm space-y-4"
           >
-            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 flex items-center gap-2">
-              <Plus className="w-4 h-4 text-sky-600" />
-              <span>Dodaj Nowego Pracownika / Brygadzistę</span>
+            <h3 className="text-base sm:text-lg font-black uppercase text-slate-900 dark:text-white flex items-center gap-2">
+              <Plus className="w-5 h-5 text-sky-600" />
+              <span>Dodaj nowego pracownika lub brygadzistę</span>
             </h3>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Imię:
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Imię: <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="np. Jan"
+                  placeholder="np. Piotr"
                   value={newUser.firstName}
                   onChange={(e) => setNewUser({ ...newUser, firstName: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-medium"
+                  className="w-full h-12 px-3.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 rounded-2xl text-sm font-semibold text-slate-900 dark:text-white"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Nazwisko:
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Nazwisko: <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="np. Kowalski"
+                  placeholder="np. Nowak"
                   value={newUser.lastName}
                   onChange={(e) => setNewUser({ ...newUser, lastName: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-medium"
+                  className="w-full h-12 px-3.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 rounded-2xl text-sm font-semibold text-slate-900 dark:text-white"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Rola / Stanowisko:
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Stanowisko / Rola:
                 </label>
                 <input
                   type="text"
-                  placeholder="np. Zbrojarz, Cieśla, Montażysta"
+                  placeholder="np. Cieśla, Zbrojarz, Montażysta"
                   value={newUser.role}
                   onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-medium"
+                  className="w-full h-12 px-3.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 rounded-2xl text-sm font-semibold text-slate-900 dark:text-white"
                 />
               </div>
+            </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Login (opcjonalny):
-                </label>
-                <input
-                  type="text"
-                  placeholder="j.kowalski"
-                  value={newUser.login}
-                  onChange={(e) => setNewUser({ ...newUser, login: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-medium"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Hasło (opcjonalne):
-                </label>
-                <input
-                  type="password"
-                  placeholder="••••••••"
-                  value={newUser.password}
-                  onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-medium"
-                />
-              </div>
-
-              {/* CHECKBOXY RÓL */}
-              <div className="flex items-center gap-4 pt-4 sm:pt-6">
-                <label className="flex items-center gap-2 cursor-pointer select-none">
+            <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
+              <div className="flex items-center gap-6">
+                <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-slate-800 dark:text-slate-200">
                   <input
                     type="checkbox"
                     checked={newUser.isForeman}
                     onChange={(e) => setNewUser({ ...newUser, isForeman: e.target.checked })}
-                    className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500"
+                    className="w-5 h-5 rounded-lg border-slate-400 text-sky-600 focus:ring-sky-500"
                   />
-                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                    Brygadzista
-                  </span>
+                  <span>Uprawnienia Brygadzisty</span>
                 </label>
 
-                <label className="flex items-center gap-2 cursor-pointer select-none">
+                <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-slate-800 dark:text-slate-200">
                   <input
                     type="checkbox"
                     checked={newUser.isAdmin}
                     onChange={(e) => setNewUser({ ...newUser, isAdmin: e.target.checked })}
-                    className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500"
+                    className="w-5 h-5 rounded-lg border-slate-400 text-amber-600 focus:ring-amber-500"
                   />
-                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                    Admin
-                  </span>
+                  <span>Administrator Systemu</span>
                 </label>
               </div>
-            </div>
 
-            <div className="flex justify-end pt-2">
               <button
                 type="submit"
-                className="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold shadow-md cursor-pointer"
+                className="px-6 py-3 bg-sky-600 hover:bg-sky-500 text-white font-black text-sm rounded-2xl shadow-md transition-all active:scale-95 cursor-pointer"
               >
-                Dodaj użytkownika
+                Dodaj pracownika
               </button>
             </div>
           </form>
 
-          {/* TABELA ISTNIEJĄCYCH UŻYTKOWNIKÓW */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-500 font-bold border-b border-slate-200 dark:border-slate-700 uppercase">
-                <tr>
-                  <th className="p-3.5">Pracownik</th>
-                  <th className="p-3.5">Rola</th>
-                  <th className="p-3.5">Brygadzista</th>
-                  <th className="p-3.5">Admin</th>
-                  <th className="p-3.5">Login</th>
-                  <th className="p-3.5 text-right">Akcja</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
-                {users.map((u) => (
-                  <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                    <td className="p-3.5 font-bold text-slate-900 dark:text-white">
-                      {u.firstName} {u.lastName}
-                    </td>
-                    <td className="p-3.5 text-slate-600 dark:text-slate-300">{u.role}</td>
-                    <td className="p-3.5">
-                      {u.isForeman ? (
-                        <span className="px-2 py-0.5 bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 rounded font-bold text-[10px]">
-                          TAK
+          {/* LISTA UŻYTKOWNIKÓW */}
+          <div className="bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden shadow-sm">
+            <div className="divide-y-2 divide-slate-100 dark:divide-slate-800">
+              {users.map((u) => (
+                <div
+                  key={u.id}
+                  className="p-4 sm:p-5 flex items-center justify-between gap-4 hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                >
+                  <div className="flex items-center gap-3.5">
+                    <div
+                      className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-sm ${
+                        u.isAdmin
+                          ? "bg-amber-500 text-slate-950"
+                          : u.isForeman
+                          ? "bg-sky-500 text-white"
+                          : "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300"
+                      }`}
+                    >
+                      {u.firstName[0]}
+                      {u.lastName[0]}
+                    </div>
+                    <div>
+                      <div className="font-black text-slate-900 dark:text-white text-base flex items-center gap-2">
+                        <span>
+                          {u.firstName} {u.lastName}
                         </span>
-                      ) : (
-                        <span className="text-slate-400">NIE</span>
-                      )}
-                    </td>
-                    <td className="p-3.5">
-                      {u.isAdmin ? (
-                        <span className="px-2 py-0.5 bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 rounded font-bold text-[10px]">
-                          ADMIN
-                        </span>
-                      ) : (
-                        <span className="text-slate-400">NIE</span>
-                      )}
-                    </td>
-                    <td className="p-3.5 font-mono text-slate-500">{u.login}</td>
-                    <td className="p-3.5 text-right">
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteUser(u.id)}
-                        className="p-1 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
-                        title="Usuń"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                        {u.isAdmin && (
+                          <span className="px-2 py-0.5 bg-amber-500/20 text-amber-800 dark:text-amber-300 text-xs font-black rounded-lg">
+                            ADMIN
+                          </span>
+                        )}
+                        {u.isForeman && (
+                          <span className="px-2 py-0.5 bg-sky-500/20 text-sky-800 dark:text-sky-300 text-xs font-black rounded-lg">
+                            BRYGADZISTA
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-slate-500 font-semibold">{u.role}</div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteUser(u.id)}
+                    className="p-2 text-slate-400 hover:text-rose-600 rounded-xl hover:bg-rose-100 dark:hover:bg-rose-950/50 transition-colors"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -473,112 +489,120 @@ export function AdminSettings({
         <div className="space-y-6">
           <form
             onSubmit={handleAddSite}
-            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4"
+            className="bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 rounded-3xl p-5 sm:p-7 shadow-sm space-y-4"
           >
-            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 flex items-center gap-2">
-              <Plus className="w-4 h-4 text-sky-600" />
-              <span>Dodaj Nowy Plac Budowy</span>
+            <h3 className="text-base sm:text-lg font-black uppercase text-slate-900 dark:text-white flex items-center gap-2">
+              <Plus className="w-5 h-5 text-sky-600" />
+              <span>Dodaj nowy plac budowy</span>
             </h3>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Nazwa Placu Budowy:
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Nazwa Placu: <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="np. Poznań - Marcelin"
+                  placeholder="np. Poznań - Marcelin Etap II"
                   value={newSiteName}
                   onChange={(e) => setNewSiteName(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-medium"
+                  className="w-full h-12 px-3.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 rounded-2xl text-sm font-semibold"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                   Adres / Lokalizacja:
                 </label>
                 <input
                   type="text"
-                  placeholder="ul. Kolorowa, Poznań"
+                  placeholder="ul. Marcelińska, Poznań"
                   value={newSiteAddress}
                   onChange={(e) => setNewSiteAddress(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-medium"
+                  className="w-full h-12 px-3.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 rounded-2xl text-sm font-semibold"
                 />
               </div>
             </div>
 
-            <div className="flex justify-end pt-2">
+            <div className="flex justify-end pt-1">
               <button
                 type="submit"
-                className="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold shadow-md cursor-pointer"
+                className="px-6 py-3 bg-sky-600 hover:bg-sky-500 text-white font-black text-sm rounded-2xl shadow-md transition-all active:scale-95 cursor-pointer"
               >
                 Dodaj plac budowy
               </button>
             </div>
           </form>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-            {sites.map((site) => (
-              <div
-                key={site.id}
-                className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl flex items-center justify-between shadow-sm"
-              >
-                <div>
-                  <div className="font-bold text-sm text-slate-900 dark:text-white">
-                    {site.name}
-                  </div>
-                  <div className="text-xs text-slate-500 mt-0.5">{site.address || "Brak adresu"}</div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleDeleteSite(site.id)}
-                  className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
+          <div className="bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden shadow-sm">
+            <div className="divide-y-2 divide-slate-100 dark:divide-slate-800">
+              {sites.map((s) => (
+                <div
+                  key={s.id}
+                  className="p-4 sm:p-5 flex items-center justify-between gap-4 hover:bg-slate-50 dark:hover:bg-slate-800/50"
                 >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
+                  <div className="flex items-center gap-3.5">
+                    <div className="p-3 bg-sky-50 dark:bg-sky-950 text-sky-600 rounded-2xl">
+                      <Building2 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="font-black text-slate-900 dark:text-white text-base">
+                        {s.name}
+                      </div>
+                      <div className="text-xs text-slate-500 font-semibold">{s.address || "Brak adresu"}</div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteSite(s.id)}
+                    className="p-2 text-slate-400 hover:text-rose-600 rounded-xl hover:bg-rose-100 dark:hover:bg-rose-950/50 transition-colors"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
 
-      {/* 3. ZAKŁADKA SZABLONÓW TEMATÓW ODPRAWY */}
+      {/* 3. ZAKŁADKA TEMATÓW BHP */}
       {activeSubTab === "topics" && (
         <div className="space-y-6">
           <form
             onSubmit={handleAddTopic}
-            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4"
+            className="bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 rounded-3xl p-5 sm:p-7 shadow-sm space-y-4"
           >
-            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 flex items-center gap-2">
-              <Plus className="w-4 h-4 text-sky-600" />
-              <span>Dodaj Szablon Zagadnienia BHP / Omawianego Obszaru</span>
+            <h3 className="text-base sm:text-lg font-black uppercase text-slate-900 dark:text-white flex items-center gap-2">
+              <Plus className="w-5 h-5 text-sky-600" />
+              <span>Dodaj szablon tematu odprawy BHP</span>
             </h3>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Treść zagadnienia:
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Treść punktu odprawy: <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="np. Kontrola zabezpieczeń krawędziowych na stropie"
+                  placeholder="np. Weryfikacja szelek asekuracyjnych przy pracach na wysokości"
                   value={newTopicTitle}
                   onChange={(e) => setNewTopicTitle(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-medium"
+                  className="w-full h-12 px-3.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 rounded-2xl text-sm font-semibold"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                   Kategoria:
                 </label>
                 <select
                   value={newTopicCategory}
                   onChange={(e) => setNewTopicCategory(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-medium"
+                  className="w-full h-12 px-3.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 rounded-2xl text-sm font-bold"
                 >
                   <option value="BHP">BHP</option>
                   <option value="Organizacja">Organizacja</option>
@@ -589,127 +613,225 @@ export function AdminSettings({
               </div>
             </div>
 
-            <div className="flex justify-end pt-2">
+            <div className="flex justify-end pt-1">
               <button
                 type="submit"
-                className="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold shadow-md cursor-pointer"
+                className="px-6 py-3 bg-sky-600 hover:bg-sky-500 text-white font-black text-sm rounded-2xl shadow-md transition-all active:scale-95 cursor-pointer"
               >
-                Dodaj szablon
+                Dodaj szablon BHP
               </button>
             </div>
           </form>
 
-          <div className="space-y-2">
-            {topicTemplates.map((item) => (
-              <div
-                key={item.id}
-                className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl flex items-center justify-between gap-3 shadow-sm"
-              >
-                <div className="flex items-center gap-2.5 text-xs text-slate-800 dark:text-slate-200">
-                  <span className="px-2 py-0.5 bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300 font-bold text-[10px] rounded-md">
-                    {item.category || "BHP"}
-                  </span>
-                  <span className="font-medium">{item.title}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleDeleteTopic(item.id)}
-                  className="p-1 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
+          <div className="bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden shadow-sm">
+            <div className="divide-y-2 divide-slate-100 dark:divide-slate-800">
+              {topicTemplates.map((t) => (
+                <div
+                  key={t.id}
+                  className="p-4 sm:p-5 flex items-center justify-between gap-4 hover:bg-slate-50 dark:hover:bg-slate-800/50"
                 >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
+                  <div className="flex items-center gap-3.5">
+                    <span className="px-2.5 py-1 bg-sky-100 dark:bg-sky-950 text-sky-800 dark:text-sky-300 text-xs font-black rounded-lg">
+                      {t.category || "BHP"}
+                    </span>
+                    <span className="font-bold text-slate-900 dark:text-white text-sm sm:text-base">
+                      {t.title}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteTopic(t.id)}
+                    className="p-2 text-slate-400 hover:text-rose-600 rounded-xl hover:bg-rose-100 dark:hover:bg-rose-950/50 transition-colors"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
 
       {/* 4. ZAKŁADKA LIST MAILINGOWYCH & RESEND */}
       {activeSubTab === "emails" && (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 sm:p-6 shadow-sm space-y-5">
-          <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 flex items-center gap-2">
-            <Mail className="w-4 h-4 text-sky-600" />
-            <span>Konfiguracja Dystrybucji E-mail & Resend API</span>
+        <div className="bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
+          <h3 className="text-base sm:text-lg font-black uppercase text-slate-900 dark:text-white flex items-center gap-2">
+            <Mail className="w-5 h-5 text-sky-600" />
+            <span>Konfiguracja Wysyłki E-mail (Resend API)</span>
           </h3>
 
           <div className="space-y-4">
             <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                Adresy odbiorców dla raportów „Rozpoczęcie prac zespołu” (oddzielone przecinkami):
+              <label className="block text-sm font-extrabold text-slate-800 dark:text-slate-200 mb-1.5">
+                Odbiorcy raportów Rozpoczęcia Prac (oddziel przecinkami):
               </label>
-              <textarea
-                rows={2}
+              <input
+                type="text"
                 value={startEmails}
                 onChange={(e) => setStartEmails(e.target.value)}
                 placeholder="raporty-start@solutionsbay.pl, kierownik.budowy@solutionsbay.pl"
-                className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs sm:text-sm font-mono text-slate-900 dark:text-white focus:ring-2 focus:ring-sky-500 focus:outline-none"
+                className="w-full h-12 px-4 bg-slate-50 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 rounded-2xl text-sm font-semibold"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                Adresy odbiorców dla raportów „Zakończenie prac zespołu” (oddzielone przecinkami):
+              <label className="block text-sm font-extrabold text-slate-800 dark:text-slate-200 mb-1.5">
+                Odbiorcy raportów Zakończenia Prac (oddziel przecinkami):
               </label>
-              <textarea
-                rows={2}
+              <input
+                type="text"
                 value={endEmails}
                 onChange={(e) => setEndEmails(e.target.value)}
                 placeholder="raporty-koniec@solutionsbay.pl, zarzad@solutionsbay.pl"
-                className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs sm:text-sm font-mono text-slate-900 dark:text-white focus:ring-2 focus:ring-sky-500 focus:outline-none"
+                className="w-full h-12 px-4 bg-slate-50 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 rounded-2xl text-sm font-semibold"
               />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5">
-                  <Key className="w-3.5 h-3.5 text-amber-500" />
-                  <span>Klucz Resend API (re_...):</span>
+                <label className="block text-sm font-extrabold text-slate-800 dark:text-slate-200 mb-1.5">
+                  Adres e-mail Nadawcy:
+                </label>
+                <input
+                  type="email"
+                  value={resendFromEmail}
+                  onChange={(e) => setResendFromEmail(e.target.value)}
+                  placeholder="raporty@shift.rycos.eu"
+                  className="w-full h-12 px-4 bg-slate-50 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 rounded-2xl text-sm font-semibold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-extrabold text-slate-800 dark:text-slate-200 mb-1.5">
+                  Klucz API Resend:
                 </label>
                 <input
                   type="password"
                   value={resendApiKey}
                   onChange={(e) => setResendApiKey(e.target.value)}
-                  placeholder="re_123456789..."
-                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs sm:text-sm font-mono text-slate-900 dark:text-white"
-                />
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Możesz wpisać klucz tutaj lub zdefiniować `RESEND_API_KEY` w zmiennych środowiskowych serwera.
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  Adres Nadawcy (From e-mail):
-                </label>
-                <input
-                  type="text"
-                  value={resendFromEmail}
-                  onChange={(e) => setResendFromEmail(e.target.value)}
-                  placeholder="raporty@solutionsbay.pl lub onboarding@resend.dev"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs sm:text-sm font-mono text-slate-900 dark:text-white"
+                  placeholder="re_xxxxxxxxxxxx"
+                  className="w-full h-12 px-4 bg-slate-50 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 rounded-2xl text-sm font-semibold font-mono"
                 />
               </div>
             </div>
 
-            <div className="flex justify-end pt-3">
+            <div className="flex justify-end pt-4">
               <button
                 type="button"
                 onClick={handleSaveSettings}
-                className="flex items-center gap-2 px-6 py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold shadow-md cursor-pointer active:scale-95 transition-all"
+                className="flex items-center gap-2 px-8 py-3.5 bg-sky-600 hover:bg-sky-500 text-white rounded-2xl font-black text-sm shadow-md cursor-pointer active:scale-95 transition-all"
               >
                 <Save className="w-4 h-4" />
-                <span>Zapisz ustawienia mailingowe</span>
+                <span>Zapisz ustawienia mailingowe w Supabase</span>
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* 5. ZAKŁADKA INSTANCJI & BRANDINGU */}
+      {/* 5. ZAKŁADKA SZABLONÓW PDF (HTML BAZA) */}
+      {activeSubTab === "templates" && (
+        <div className="bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
+            <div>
+              <h3 className="text-base sm:text-lg font-black uppercase text-slate-900 dark:text-white flex items-center gap-2">
+                <FileCode className="w-5 h-5 text-sky-600" />
+                <span>Szablony PDF (HTML w bazie danych Supabase)</span>
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+                Szablony HTML generowane są w 100% z kodowaniem UTF-8, obsługując dowolne logo, kolory i układ tabeli.
+              </p>
+            </div>
+
+            {/* PRZEŁĄCZNIK TYPU SZABLONU */}
+            <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedTemplateType("START_SHIFT");
+                  const tpl = pdfTemplates.find((t) => t.reportType === "START_SHIFT");
+                  if (tpl) setTemplateCode(tpl.htmlContent);
+                }}
+                className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                  selectedTemplateType === "START_SHIFT"
+                    ? "bg-sky-600 text-white shadow-md"
+                    : "text-slate-600 dark:text-slate-400"
+                }`}
+              >
+                Rozpoczęcie prac
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedTemplateType("END_SHIFT");
+                  const tpl = pdfTemplates.find((t) => t.reportType === "END_SHIFT");
+                  if (tpl) setTemplateCode(tpl.htmlContent);
+                }}
+                className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                  selectedTemplateType === "END_SHIFT"
+                    ? "bg-indigo-600 text-white shadow-md"
+                    : "text-slate-600 dark:text-slate-400"
+                }`}
+              >
+                Zakończenie prac
+              </button>
+            </div>
+          </div>
+
+          {/* INFORMACJA O ZAPISIE W BAZIE */}
+          <div className="p-4 bg-sky-50 dark:bg-sky-950/60 border-2 border-sky-200 dark:border-sky-800 rounded-2xl text-xs sm:text-sm text-sky-900 dark:text-sky-200 font-semibold space-y-1">
+            <div className="flex items-center gap-2 font-black text-sky-800 dark:text-sky-300">
+              <Sparkles className="w-4 h-4 text-sky-500" />
+              <span>Tabela: public.pdf_templates (Supabase PostgreSQL)</span>
+            </div>
+            <div>
+              Edytujesz aktywny szablon: <strong>{currentTemplate?.name || selectedTemplateType}</strong>.
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-extrabold text-slate-800 dark:text-slate-200 mb-2">
+              Kod źródłowy szablonu HTML / CSS:
+            </label>
+            <textarea
+              rows={12}
+              value={templateCode}
+              onChange={(e) => setTemplateCode(e.target.value)}
+              className="w-full p-4 bg-slate-950 text-sky-300 font-mono text-xs sm:text-sm rounded-2xl border-2 border-slate-800 focus:ring-4 focus:ring-sky-500/20 focus:border-sky-500 focus:outline-none leading-relaxed"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => {
+                const def = INITIAL_PDF_TEMPLATES.find((t) => t.reportType === selectedTemplateType);
+                if (def) setTemplateCode(def.htmlContent);
+              }}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold cursor-pointer"
+            >
+              <RotateCcw className="w-4 h-4" />
+              <span>Przywróć domyślny kod HTML</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSaveTemplate}
+              className="flex items-center gap-2 px-8 py-3.5 bg-sky-600 hover:bg-sky-500 text-white rounded-2xl font-black text-sm shadow-md cursor-pointer active:scale-95 transition-all"
+            >
+              <Save className="w-4 h-4" />
+              <span>Zapisz szablon HTML w bazie Supabase</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 6. ZAKŁADKA INSTANCJI & BRANDINGU */}
       {activeSubTab === "tenant" && (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 sm:p-6 shadow-sm space-y-5">
-          <h3 className="text-sm font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 flex items-center gap-2">
-            <Layers className="w-4 h-4 text-sky-600" />
+        <div className="bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
+          <h3 className="text-base sm:text-lg font-black uppercase text-slate-900 dark:text-white flex items-center gap-2">
+            <Layers className="w-5 h-5 text-sky-600" />
             <span>Wieloinstancyjność & Branding (Multi-Instance)</span>
           </h3>
 
@@ -723,7 +845,7 @@ export function AdminSettings({
                 value={orgName}
                 onChange={(e) => setOrgName(e.target.value)}
                 placeholder="SolutionsBay / SB Technology"
-                className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs sm:text-sm font-semibold"
+                className="w-full h-12 px-4 bg-slate-50 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 rounded-2xl text-sm font-semibold"
               />
             </div>
 
@@ -736,16 +858,16 @@ export function AdminSettings({
                 value={logoText}
                 onChange={(e) => setLogoText(e.target.value)}
                 placeholder="SB Technology"
-                className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs sm:text-sm font-semibold"
+                className="w-full h-12 px-4 bg-slate-50 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 rounded-2xl text-sm font-semibold"
               />
             </div>
           </div>
 
-          <div className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl text-xs text-slate-600 dark:text-slate-300 space-y-1">
+          <div className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-2xl text-xs sm:text-sm text-slate-600 dark:text-slate-300 space-y-1 border border-slate-200 dark:border-slate-700">
             <div className="font-bold text-slate-900 dark:text-white">Identyfikator instancji:</div>
-            <div className="font-mono text-sky-600 dark:text-sky-400">{settings.tenantId}</div>
-            <p className="text-[11px] text-slate-400 pt-1">
-              Architektura RYCOS Shift umożliwia podłączenie kolejnych instancji podwykonawców lub innych oddziałów z odrębnymi bazami placów i logotypami.
+            <div className="font-mono text-sky-600 dark:text-sky-400 font-bold">{settings.tenantId}</div>
+            <p className="text-xs text-slate-400 pt-1">
+              Architektura RYCOS Shift umożliwia podłączenie kolejnych instancji podwykonawców lub innych oddziałów z odrębnymi bazami placów i szablonami HTML.
             </p>
           </div>
 
@@ -753,7 +875,7 @@ export function AdminSettings({
             <button
               type="button"
               onClick={handleSaveSettings}
-              className="flex items-center gap-2 px-6 py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold shadow-md cursor-pointer active:scale-95 transition-all"
+              className="flex items-center gap-2 px-8 py-3.5 bg-sky-600 hover:bg-sky-500 text-white rounded-2xl text-sm font-black shadow-md cursor-pointer active:scale-95 transition-all"
             >
               <Save className="w-4 h-4" />
               <span>Zapisz konfigurację instancji</span>

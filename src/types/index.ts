@@ -87,3 +87,13 @@ export interface TenantSettings {
   resendFromEmail?: string;
   storageFolder?: string;
 }
+
+export interface PdfTemplate {
+  id: string;
+  tenantId: string;
+  reportType: ReportType;
+  name: string;
+  htmlContent: string;
+  active: boolean;
+  updatedAt: string;
+}
