@@ -187,7 +187,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true });
     }
 
-    // 4. Zapis/Synchronizacja Ustawień
+    // 4. Zapis/Synchronizacja Szablonów Tematów
+    if (action === "SYNC_TOPICS" && topics) {
+      const mapped = topics.map((t: DiscussedTopicTemplate) => ({
+        id: t.id,
+        title: t.title,
+        category: t.category || "BHP",
+      }));
+      await supabase.from("topic_templates").upsert(mapped, { onConflict: "id" });
+      return NextResponse.json({ success: true });
+    }
+
+    // 5. Zapis/Synchronizacja Ustawień
     if (action === "SYNC_SETTINGS" && settings) {
       await supabase.from("tenant_settings").upsert(
         {

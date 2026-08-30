@@ -146,6 +146,11 @@ export default function Home() {
   const handleUpdateTopics = (updated: DiscussedTopicTemplate[]) => {
     setTopics(updated);
     saveStoredTopics(updated);
+    fetch("/api/db/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "SYNC_TOPICS", topics: updated }),
+    }).catch(() => {});
   };
 
   const handleUpdateSettings = (updated: TenantSettings) => {
