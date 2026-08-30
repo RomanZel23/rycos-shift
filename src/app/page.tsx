@@ -6,6 +6,7 @@ import { StartShiftForm } from "@/components/StartShiftForm";
 import { EndShiftForm } from "@/components/EndShiftForm";
 import { ReportArchive } from "@/components/ReportArchive";
 import { AdminSettings } from "@/components/AdminSettings";
+import { PwaInstallPrompt } from "@/components/PwaInstallPrompt";
 import {
   User,
   ConstructionSite,
@@ -212,6 +213,9 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans antialiased selection:bg-sky-500 selection:text-white">
+      {/* BANER AUTOMATYCZNEJ INSTALACJI PWA */}
+      <PwaInstallPrompt />
+
       {/* NAGŁÓWEK SYSTEMU */}
       <Header
         activeTab={activeTab}
