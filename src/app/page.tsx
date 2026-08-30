@@ -63,6 +63,41 @@ export default function Home() {
     setCurrentUserId(loadedCurrentUserId);
 
     setMounted(true);
+
+    // Automatyczna synchronizacja z Supabase (w tle)
+    const syncWithDatabase = async () => {
+      try {
+        const res = await fetch("/api/db/sync");
+        const resJson = await res.json();
+        if (resJson.success && resJson.isConnected && resJson.data) {
+          const { users: dbUsers, sites: dbSites, topics: dbTopics, settings: dbSettings, reports: dbReports } = resJson.data;
+          if (dbUsers && dbUsers.length > 0) {
+            setUsers(dbUsers);
+            saveStoredUsers(dbUsers);
+          }
+          if (dbSites && dbSites.length > 0) {
+            setSites(dbSites);
+            saveStoredSites(dbSites);
+          }
+          if (dbTopics && dbTopics.length > 0) {
+            setTopics(dbTopics);
+            saveStoredTopics(dbTopics);
+          }
+          if (dbSettings) {
+            setSettings(dbSettings);
+            saveStoredSettings(dbSettings);
+          }
+          if (dbReports && dbReports.length > 0) {
+            setReports(dbReports);
+            localStorage.setItem("rycos_shift_reports_v1", JSON.stringify(dbReports));
+          }
+        }
+      } catch (err) {
+        console.warn("Supabase background sync skipped (offline or unconfigured):", err);
+      }
+    };
+
+    syncWithDatabase();
   }, []);
 
   const currentUser =
@@ -91,11 +126,21 @@ export default function Home() {
   const handleUpdateUsers = (updated: User[]) => {
     setUsers(updated);
     saveStoredUsers(updated);
+    fetch("/api/db/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "SYNC_USERS", users: updated }),
+    }).catch(() => {});
   };
 
   const handleUpdateSites = (updated: ConstructionSite[]) => {
     setSites(updated);
     saveStoredSites(updated);
+    fetch("/api/db/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "SYNC_SITES", sites: updated }),
+    }).catch(() => {});
   };
 
   const handleUpdateTopics = (updated: DiscussedTopicTemplate[]) => {
@@ -106,10 +151,20 @@ export default function Home() {
   const handleUpdateSettings = (updated: TenantSettings) => {
     setSettings(updated);
     saveStoredSettings(updated);
+    fetch("/api/db/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "SYNC_SETTINGS", settings: updated }),
+    }).catch(() => {});
   };
 
   const handleReportCreated = (newReport: DailyReport) => {
     setReports((prev) => [newReport, ...prev]);
+    fetch("/api/db/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "SAVE_REPORT", report: newReport }),
+    }).catch(() => {});
   };
 
   if (!mounted) {

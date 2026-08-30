@@ -1,6 +1,6 @@
 {
   "name": "rycos-shift",
-  "version": "0.1.0",
+  "version": "1.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev --webpack",
@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@prisma/client": "^7.10.0",
+    "@supabase/supabase-js": "^2.112.4",
     "clsx": "^2.1.1",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",

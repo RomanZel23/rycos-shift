@@ -1,0 +1,80 @@
+// Prisma Schema dla RYCOS Shift (Supabase PostgreSQL)
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  firstName String   @map("first_name")
+  lastName  String   @map("last_name")
+  role      String   @default("Pracownik")
+  isForeman Boolean  @default(false) @map("is_foreman")
+  isAdmin   Boolean  @default(false) @map("is_admin")
+  login     String?
+  password  String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("users")
+}
+
+model ConstructionSite {
+  id        String   @id @default(cuid())
+  name      String
+  address   String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("construction_sites")
+}
+
+model TopicTemplate {
+  id        String   @id @default(cuid())
+  title     String
+  category  String?  @default("BHP")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("topic_templates")
+}
+
+model DailyReport {
+  id                 String   @id @default(cuid())
+  tenantId           String   @default("tenant-sb-tech-poznan") @map("tenant_id")
+  reportType         String   @map("report_type") // 'START_SHIFT' | 'END_SHIFT'
+  date               String
+  time               String
+  siteId             String?  @map("site_id")
+  siteName           String   @map("site_name")
+  foremanId          String?  @map("foreman_id")
+  foremanName        String   @map("foreman_name")
+  location           Json?
+  discussedTopics    Json?    @map("discussed_topics")
+  attendanceList     Json?    @map("attendance_list")
+  photoDocumentation Json?    @map("photo_documentation")
+  pdfFileName        String   @map("pdf_file_name")
+  pdfDataUrl         String?  @map("pdf_data_url")
+  sentToEmails       Json?    @map("sent_to_emails")
+  sentAt             DateTime @default(now()) @map("sent_at")
+  status             String   @default("SENT")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  @@map("daily_reports")
+}
+
+model TenantSettings {
+  tenantId                  String   @id @default("tenant-sb-tech-poznan") @map("tenant_id")
+  organizationName          String   @default("SolutionsBay / SB Technology") @map("organization_name")
+  logoText                  String   @default("SB Technology") @map("logo_text")
+  logoSubtitle              String   @default("RYCOS Shift workflow") @map("logo_subtitle")
+  startShiftEmailRecipients Json?    @map("start_shift_email_recipients")
+  endShiftEmailRecipients   Json?    @map("end_shift_email_recipients")
+  resendFromEmail           String?  @default("raporty@shift.rycos.eu") @map("resend_from_email")
+  createdAt                 DateTime @default(now()) @map("created_at")
+  updatedAt                 DateTime @updatedAt @map("updated_at")
+
+  @@map("tenant_settings")
+}
