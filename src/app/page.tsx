@@ -17,6 +17,11 @@ import {
   PdfTemplate,
 } from "@/types";
 import {
+  INITIAL_USERS,
+  INITIAL_SITES,
+  INITIAL_TOPIC_TEMPLATES,
+  INITIAL_SETTINGS,
+  INITIAL_PDF_TEMPLATES,
   getStoredUsers,
   saveStoredUsers,
   getStoredSites,
@@ -30,50 +35,43 @@ import {
   saveStoredPdfTemplates,
   getStoredLoggedUser,
   setStoredLoggedUser,
-  INITIAL_PDF_TEMPLATES,
 } from "@/lib/storage";
 
 export default function Home() {
-  const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>("START_SHIFT");
 
-  // Główne stany aplikacji
-  const [users, setUsers] = useState<User[]>([]);
-  const [sites, setSites] = useState<ConstructionSite[]>([]);
-  const [topics, setTopics] = useState<DiscussedTopicTemplate[]>([]);
-  const [settings, setSettings] = useState<TenantSettings>({
-    tenantId: "tenant-sb-tech-poznan",
-    organizationName: "SolutionsBay / SB Technology",
-    logoText: "SB Technology",
-    logoSubtitle: "RYCOS Shift workflow",
-    startShiftEmailRecipients: ["raporty-start@solutionsbay.pl"],
-    endShiftEmailRecipients: ["raporty-koniec@solutionsbay.pl"],
-  });
+  // Główne stany aplikacji zainicjalizowane od razu danymi startowymi (brak blokowania na loaderze)
+  const [users, setUsers] = useState<User[]>(INITIAL_USERS);
+  const [sites, setSites] = useState<ConstructionSite[]>(INITIAL_SITES);
+  const [topics, setTopics] = useState<DiscussedTopicTemplate[]>(INITIAL_TOPIC_TEMPLATES);
+  const [settings, setSettings] = useState<TenantSettings>(INITIAL_SETTINGS);
   const [reports, setReports] = useState<DailyReport[]>([]);
   const [pdfTemplates, setPdfTemplates] = useState<PdfTemplate[]>(INITIAL_PDF_TEMPLATES);
   
   // Stan autentykacji / zalogowanego użytkownika
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  // Inicjalizacja z localStorage
+  // Inicjalizacja z localStorage i synchronizacja w tle
   useEffect(() => {
-    const loadedUsers = getStoredUsers();
-    const loadedSites = getStoredSites();
-    const loadedTopics = getStoredTopics();
-    const loadedSettings = getStoredSettings();
-    const loadedReports = getStoredReports();
-    const loadedTemplates = getStoredPdfTemplates();
-    const loggedUser = getStoredLoggedUser();
+    try {
+      const loadedUsers = getStoredUsers();
+      const loadedSites = getStoredSites();
+      const loadedTopics = getStoredTopics();
+      const loadedSettings = getStoredSettings();
+      const loadedReports = getStoredReports();
+      const loadedTemplates = getStoredPdfTemplates();
+      const loggedUser = getStoredLoggedUser();
 
-    setUsers(loadedUsers);
-    setSites(loadedSites);
-    setTopics(loadedTopics);
-    setSettings(loadedSettings);
-    setReports(loadedReports);
-    setPdfTemplates(loadedTemplates);
-    setCurrentUser(loggedUser);
-
-    setMounted(true);
+      if (loadedUsers && loadedUsers.length > 0) setUsers(loadedUsers);
+      if (loadedSites && loadedSites.length > 0) setSites(loadedSites);
+      if (loadedTopics && loadedTopics.length > 0) setTopics(loadedTopics);
+      if (loadedSettings) setSettings(loadedSettings);
+      if (loadedReports) setReports(loadedReports);
+      if (loadedTemplates && loadedTemplates.length > 0) setPdfTemplates(loadedTemplates);
+      if (loggedUser) setCurrentUser(loggedUser);
+    } catch (storageErr) {
+      console.warn("Storage hydration notice:", storageErr);
+    }
 
     // Automatyczna synchronizacja z Supabase (w tle)
     const syncWithDatabase = async () => {
@@ -92,7 +90,7 @@ export default function Home() {
           if (dbUsers && dbUsers.length > 0) {
             setUsers(dbUsers);
             saveStoredUsers(dbUsers);
-            // Zaktualizuj dane zalogowanego użytkownika jeśli zmieniły się w bazie
+            const loggedUser = getStoredLoggedUser();
             if (loggedUser) {
               const updatedCurrent = dbUsers.find((u: User) => u.id === loggedUser.id);
               if (updatedCurrent) {
@@ -115,7 +113,9 @@ export default function Home() {
           }
           if (dbReports && dbReports.length > 0) {
             setReports(dbReports);
-            localStorage.setItem("rycos_shift_reports_v1", JSON.stringify(dbReports));
+            try {
+              localStorage.setItem("rycos_shift_reports_v1", JSON.stringify(dbReports));
+            } catch {}
           }
           if (dbTemplates && dbTemplates.length > 0) {
             setPdfTemplates(dbTemplates);
@@ -210,17 +210,7 @@ export default function Home() {
     }).catch(() => {});
   };
 
-  if (!mounted) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white">
-        <div className="w-12 h-12 border-4 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
-        <div className="mt-4 font-black text-lg tracking-wider text-sky-400">iDream | SolutionsBay</div>
-        <div className="text-xs text-slate-400 mt-1">Ładowanie systemu RYCOS Shift...</div>
-      </div>
-    );
-  }
-
-  // JEŚLI UŻYTKOWNIK NIE JEST ZALOGOWANY -> POKAŻ EKRAN LOGOWANIA
+  // JEŚLI UŻYTKOWNIK NIE JEST ZALOGOWANY -> POKAŻ OD RAZU EKRAN LOGOWANIA
   if (!currentUser) {
     return (
       <>

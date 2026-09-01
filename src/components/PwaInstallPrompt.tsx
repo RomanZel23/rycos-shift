@@ -52,10 +52,13 @@ export function PwaInstallPrompt() {
 
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
 
-    // Sprawdź czy wcześniej użytkownik nie zamknął banera w tej sesji
-    const wasDismissed = sessionStorage.getItem("pwa_prompt_dismissed");
-    if (wasDismissed) {
-      setDismissed(true);
+    try {
+      const wasDismissed = sessionStorage.getItem("pwa_prompt_dismissed");
+      if (wasDismissed) {
+        setDismissed(true);
+      }
+    } catch {
+      // ignore
     }
 
     return () => {

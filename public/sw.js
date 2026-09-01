@@ -1,17 +1,7 @@
-// RYCOS Shift Service Worker
-const CACHE_NAME = "rycos-shift-v1";
-const ASSETS_TO_CACHE = [
-  "/",
-  "/manifest.json",
-  "/icon.svg"
-];
+// RYCOS Shift Service Worker - Safari & Mobile Compatible (v1.3)
+const CACHE_NAME = "rycos-shift-v1.3";
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
-    })
-  );
   self.skipWaiting();
 });
 
@@ -30,24 +20,25 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
+// Network-first strategy: always fetch fresh resources, fallback to cache only if offline
 self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET") return;
+  // Nie przechwytuj zapytań API ani schematów innych niż http/https
+  if (
+    event.request.method !== "GET" ||
+    event.request.url.includes("/api/") ||
+    !event.request.url.startsWith("http")
+  ) {
+    return;
+  }
 
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        // Zaktualizuj cache jeśli odpowiedź jest poprawna
-        if (response && response.status === 200 && response.type === "basic") {
-          const responseToCache = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
-        }
         return response;
       })
       .catch(() => {
-        return caches.match(event.request).then((cached) => {
-          if (cached) return cached;
+        return caches.match(event.request).then((cachedResponse) => {
+          if (cachedResponse) return cachedResponse;
           if (event.request.headers.get("accept")?.includes("text/html")) {
             return caches.match("/");
           }
