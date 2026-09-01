@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Header, ActiveTab } from "@/components/Header";
 import { StartShiftForm } from "@/components/StartShiftForm";
 import { EndShiftForm } from "@/components/EndShiftForm";
@@ -51,6 +51,14 @@ export default function Home() {
   // Stan autentykacji / zalogowanego użytkownika
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
+  // Obsługa nawigacji 'Wstecz' na Androidzie (PWA / Browser History)
+  const handleTabChange = useCallback((newTab: ActiveTab, pushHistory = true) => {
+    setActiveTab(newTab);
+    if (pushHistory && typeof window !== "undefined") {
+      window.history.pushState({ tab: newTab }, "");
+    }
+  }, []);
+
   // Inicjalizacja z localStorage i synchronizacja w tle
   useEffect(() => {
     try {
@@ -71,6 +79,22 @@ export default function Home() {
       if (loggedUser) setCurrentUser(loggedUser);
     } catch (storageErr) {
       console.warn("Storage hydration notice:", storageErr);
+    }
+
+    // Inicjalizacja bazowego stanu historii dla PWA
+    if (typeof window !== "undefined") {
+      window.history.replaceState({ tab: "START_SHIFT" }, "");
+
+      const handlePopState = (e: PopStateEvent) => {
+        if (e.state && e.state.tab) {
+          setActiveTab(e.state.tab);
+        } else if (!e.state || !e.state.modal) {
+          setActiveTab("START_SHIFT");
+        }
+      };
+
+      window.addEventListener("popstate", handlePopState);
+      return () => window.removeEventListener("popstate", handlePopState);
     }
 
     // Automatyczna synchronizacja z Supabase (w tle)
@@ -134,20 +158,20 @@ export default function Home() {
   const handleLogin = (user: User) => {
     setCurrentUser(user);
     setStoredLoggedUser(user);
-    setActiveTab("START_SHIFT");
+    handleTabChange("START_SHIFT", false);
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
     setStoredLoggedUser(null);
-    setActiveTab("START_SHIFT");
+    handleTabChange("START_SHIFT", false);
   };
 
   const handleUserChange = (user: User) => {
     setCurrentUser(user);
     setStoredLoggedUser(user);
     if (!user.isAdmin && activeTab === "SETTINGS") {
-      setActiveTab("START_SHIFT");
+      handleTabChange("START_SHIFT");
     }
   };
 
@@ -228,7 +252,7 @@ export default function Home() {
       {/* NAGŁÓWEK SYSTEMU Z PROFILEM I WYLOGOWANIEM */}
       <Header
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={handleTabChange}
         currentUser={currentUser}
         allUsers={users}
         onUserChange={handleUserChange}
@@ -246,7 +270,7 @@ export default function Home() {
             topicTemplates={topics}
             settings={settings}
             onReportCreated={handleReportCreated}
-            onNavigateToArchive={() => setActiveTab("ARCHIVE")}
+            onNavigateToArchive={() => handleTabChange("ARCHIVE")}
           />
         )}
 
@@ -256,15 +280,15 @@ export default function Home() {
             users={users}
             settings={settings}
             onReportCreated={handleReportCreated}
-            onNavigateToArchive={() => setActiveTab("ARCHIVE")}
+            onNavigateToArchive={() => handleTabChange("ARCHIVE")}
           />
         )}
 
         {activeTab === "ARCHIVE" && (
           <ReportArchive
             reports={reports}
-            onNewStartReport={() => setActiveTab("START_SHIFT")}
-            onNewEndReport={() => setActiveTab("END_SHIFT")}
+            onNewStartReport={() => handleTabChange("START_SHIFT")}
+            onNewEndReport={() => handleTabChange("END_SHIFT")}
           />
         )}
 
@@ -294,7 +318,7 @@ export default function Home() {
             System RYCOS Shift — Raportowanie odpraw i fotorelacji z budowy
           </div>
           <div className="font-mono text-[11px] text-slate-400">
-            Wersja 1.2 (Papier Firmowy & Auth)
+            Wersja 1.3 (PWA Android Back Support)
           </div>
         </div>
       </footer>

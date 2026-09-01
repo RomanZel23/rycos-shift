@@ -46,17 +46,60 @@ export function ReportArchive({
   const [previewReport, setPreviewReport] = useState<DailyReport | null>(null);
   const [zoomPhoto, setZoomPhoto] = useState<ZoomPhotoData | null>(null);
 
-  // Obsługa klawisza Escape dla zamknięcia powiększenia
+  // Synchronizacja modali ze stosem historii przeglądarki (Android Back gesture/button & Escape)
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        if (zoomPhoto) setZoomPhoto(null);
-        else if (previewReport) setPreviewReport(null);
+    const handlePopState = () => {
+      if (zoomPhoto) {
+        setZoomPhoto(null);
+      } else if (previewReport) {
+        setPreviewReport(null);
       }
     };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (zoomPhoto) closeZoomPhoto();
+        else if (previewReport) closePreviewReport();
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
   }, [zoomPhoto, previewReport]);
+
+  const openPreviewReport = (report: DailyReport) => {
+    if (typeof window !== "undefined") {
+      window.history.pushState({ modal: "report_preview" }, "");
+    }
+    setPreviewReport(report);
+  };
+
+  const closePreviewReport = () => {
+    if (typeof window !== "undefined" && window.history.state?.modal === "report_preview") {
+      window.history.back();
+    } else {
+      setPreviewReport(null);
+    }
+  };
+
+  const openZoomPhoto = (data: ZoomPhotoData) => {
+    if (typeof window !== "undefined") {
+      window.history.pushState({ modal: "photo_zoom" }, "");
+    }
+    setZoomPhoto(data);
+  };
+
+  const closeZoomPhoto = () => {
+    if (typeof window !== "undefined" && window.history.state?.modal === "photo_zoom") {
+      window.history.back();
+    } else {
+      setZoomPhoto(null);
+    }
+  };
 
   const filteredReports = reports.filter((r) => {
     const matchesType =
@@ -230,7 +273,7 @@ export function ReportArchive({
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => setPreviewReport(report)}
+                      onClick={() => openPreviewReport(report)}
                       className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-xs sm:text-sm font-bold transition-colors cursor-pointer"
                     >
                       <Eye className="w-4 h-4 text-sky-500" />
@@ -316,7 +359,7 @@ export function ReportArchive({
               </div>
               <button
                 type="button"
-                onClick={() => setPreviewReport(null)}
+                onClick={closePreviewReport}
                 className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 <X className="w-6 h-6" />
@@ -437,7 +480,7 @@ export function ReportArchive({
                       <div
                         key={photo.id}
                         onClick={() =>
-                          setZoomPhoto({
+                          openZoomPhoto({
                             url: photo.photoDataUrl,
                             description: photo.description,
                             takenAt: photo.takenAt,
@@ -476,7 +519,7 @@ export function ReportArchive({
             <div className="px-6 py-4 bg-slate-50 dark:bg-slate-900/80 border-t-2 border-slate-200 dark:border-slate-800 flex items-center justify-end gap-3">
               <button
                 type="button"
-                onClick={() => setPreviewReport(null)}
+                onClick={closePreviewReport}
                 className="px-5 py-3 rounded-2xl border-2 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 font-bold text-sm transition-colors cursor-pointer"
               >
                 Zamknij
@@ -485,7 +528,7 @@ export function ReportArchive({
                 type="button"
                 onClick={() => {
                   handleDownload(previewReport);
-                  setPreviewReport(null);
+                  closePreviewReport();
                 }}
                 className="flex items-center gap-2 px-6 py-3 bg-sky-600 hover:bg-sky-500 text-white font-black text-sm rounded-2xl shadow-lg shadow-sky-600/30 transition-all cursor-pointer active:scale-95"
               >
@@ -501,7 +544,7 @@ export function ReportArchive({
       {zoomPhoto && (
         <div
           className="fixed inset-0 z-[60] bg-black/95 backdrop-blur-md flex flex-col items-center justify-between p-4 sm:p-6 animate-fade-in"
-          onClick={() => setZoomPhoto(null)}
+          onClick={closeZoomPhoto}
         >
           {/* Pasek górny modala powiększenia */}
           <div
@@ -532,8 +575,8 @@ export function ReportArchive({
               </a>
               <button
                 type="button"
-                onClick={() => setZoomPhoto(null)}
-                title="Zamknij (Esc)"
+                onClick={closeZoomPhoto}
+                title="Zamknij (Esc lub Wstecz)"
                 className="p-2.5 rounded-xl bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white transition-colors cursor-pointer"
               >
                 <X className="w-6 h-6" />
