@@ -86,7 +86,7 @@ export function generateStartShiftHtml(report: DailyReport, settings?: TenantSet
     .join("");
 
   return `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; width: 794px; min-height: 1123px; background-color: #ffffff; color: #0f172a; padding: 36px 44px; box-sizing: border-box; position: relative; display: flex; flex-direction: column; justify-content: space-between;">
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; width: 794px; min-height: 1115px; background-color: #ffffff; color: #0f172a; padding: 34px 44px; box-sizing: border-box; position: relative; display: flex; flex-direction: column; justify-content: space-between;">
       
       <div>
         <!-- 1. OFICJALNY NAGŁÓWEK PAPIERU FIRMOWEGO (idream.png / sb-logo inline SVG) -->
@@ -233,7 +233,7 @@ export function generateEndShiftHtml(report: DailyReport, settings?: TenantSetti
     .join("");
 
   return `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; width: 794px; min-height: 1123px; background-color: #ffffff; color: #0f172a; padding: 36px 44px; box-sizing: border-box; position: relative; display: flex; flex-direction: column; justify-content: space-between;">
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; width: 794px; min-height: 1115px; background-color: #ffffff; color: #0f172a; padding: 34px 44px; box-sizing: border-box; position: relative; display: flex; flex-direction: column; justify-content: space-between;">
       
       <div>
         <!-- 1. OFICJALNY NAGŁÓWEK PAPIERU FIRMOWEGO (idream.png / sb-logo inline SVG) -->

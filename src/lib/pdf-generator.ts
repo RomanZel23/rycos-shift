@@ -94,8 +94,8 @@ export async function generateReportPDFAsync(
       pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
       heightLeft -= pdfHeight;
 
-      // Obsługa wielostronicowości, jeśli dokument jest dłuższy niż A4
-      while (heightLeft > 0) {
+      // Obsługa wielostronicowości – dodaj kolejną stronę tylko jeśli pozostała treść ma więcej niż 8mm (eliminuje pustą 2. stronę przy zaokrągleniach pikseli)
+      while (heightLeft > 8) {
         position = heightLeft - imgHeight;
         pdf.addPage();
         pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
