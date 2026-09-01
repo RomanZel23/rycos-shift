@@ -72,9 +72,9 @@ function renderPhotoDocBadge(): string {
 
 function renderPhotoNumberBadge(idx: number): string {
   return `
-    <svg width="72" height="20" viewBox="0 0 72 20" style="position: absolute; top: 6px; left: 6px; display: block;">
-      <rect width="72" height="20" rx="4" fill="rgba(15, 23, 42, 0.85)" />
-      <text x="36" y="10" fill="#ffffff" font-size="9" font-weight="900" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" text-anchor="middle" dominant-baseline="central">Zdjęcie #${idx + 1}</text>
+    <svg width="84" height="22" viewBox="0 0 84 22" style="position: absolute; top: 8px; left: 8px; display: block; border-radius: 4px; overflow: hidden;">
+      <rect width="84" height="22" rx="4" fill="#0f172a" fill-opacity="0.9" />
+      <text x="42" y="11" fill="#ffffff" font-size="9" font-weight="900" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" text-anchor="middle" dominant-baseline="central" letter-spacing="0.5">ZDJĘCIE #${idx + 1}</text>
     </svg>
   `;
 }
