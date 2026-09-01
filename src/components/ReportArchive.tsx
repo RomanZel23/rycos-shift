@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   FileText,
   Download,
@@ -14,6 +14,9 @@ import {
   X,
   Send,
   Camera,
+  ZoomIn,
+  ExternalLink,
+  Maximize2,
 } from "lucide-react";
 import { DailyReport } from "@/types";
 import { generateReportPDFAsync } from "@/lib/pdf-generator";
@@ -25,6 +28,14 @@ interface ReportArchiveProps {
   onNewEndReport: () => void;
 }
 
+interface ZoomPhotoData {
+  url: string;
+  description: string;
+  takenAt?: string;
+  index: number;
+  total: number;
+}
+
 export function ReportArchive({
   reports,
   onNewStartReport,
@@ -33,6 +44,19 @@ export function ReportArchive({
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<string>("ALL");
   const [previewReport, setPreviewReport] = useState<DailyReport | null>(null);
+  const [zoomPhoto, setZoomPhoto] = useState<ZoomPhotoData | null>(null);
+
+  // Obsługa klawisza Escape dla zamknięcia powiększenia
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (zoomPhoto) setZoomPhoto(null);
+        else if (previewReport) setPreviewReport(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [zoomPhoto, previewReport]);
 
   const filteredReports = reports.filter((r) => {
     const matchesType =
@@ -46,7 +70,7 @@ export function ReportArchive({
   });
 
   const handleDownload = async (report: DailyReport) => {
-    // Jeśli plik PDF znajduje się już w Supabase Storage Bucket, pobierz bezpośrednio z CDN
+    // Jeśli plik PDF znajduje się już w Supabase Storage Bucket, otwórz bezpośrednio z CDN
     if (report.pdfDataUrl && report.pdfDataUrl.startsWith("http")) {
       window.open(report.pdfDataUrl, "_blank");
       return;
@@ -69,10 +93,10 @@ export function ReportArchive({
             <span>Repozytorium Raportów</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-            Archiwum Raportów Dziennych
+            Archiwum Raportów
           </h1>
-          <p className="text-sm sm:text-base text-slate-300 mt-1 font-medium">
-            Zestawienie wygenerowanych i podpisanych raportów terenowych
+          <p className="text-sm text-slate-300 font-semibold mt-1">
+            Historia odpraw i fotorelacji z budów • Pliki PDF w chmurze
           </p>
         </div>
 
@@ -80,41 +104,43 @@ export function ReportArchive({
           <button
             type="button"
             onClick={onNewStartReport}
-            className="px-5 py-3 bg-sky-600 hover:bg-sky-500 text-white text-sm sm:text-base font-black rounded-2xl shadow-md shadow-sky-600/30 transition-all active:scale-95 cursor-pointer"
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-3 bg-sky-600 hover:bg-sky-500 text-white font-bold text-sm rounded-2xl shadow-md shadow-sky-600/30 transition-all cursor-pointer active:scale-95"
           >
-            + Rozpoczęcie prac
+            <FileText className="w-4 h-4" />
+            <span>Nowa Odprawa</span>
           </button>
           <button
             type="button"
             onClick={onNewEndReport}
-            className="px-5 py-3 bg-indigo-600 hover:bg-indigo-500 text-white text-sm sm:text-base font-black rounded-2xl shadow-md shadow-indigo-600/30 transition-all active:scale-95 cursor-pointer"
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm rounded-2xl shadow-md shadow-indigo-600/30 transition-all cursor-pointer active:scale-95"
           >
-            + Zakończenie prac
+            <Camera className="w-4 h-4" />
+            <span>Fotorelacja</span>
           </button>
         </div>
       </div>
 
-      {/* FILTROWANIE I SZUKANIE */}
-      <div className="bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-5 shadow-sm flex flex-col sm:flex-row gap-4 items-center justify-between">
-        <div className="relative w-full sm:w-96">
+      {/* FILTROWANIE I WYSZUKIWANIE */}
+      <div className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-3xl border-2 border-slate-200 dark:border-slate-800 shadow-sm flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Szukaj placu, brygadzisty, daty..."
+            placeholder="Szukaj po budowie, brygadziście, dacie..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full h-13 pl-11 pr-4 bg-slate-50 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 rounded-2xl text-sm sm:text-base font-semibold text-slate-900 dark:text-white focus:ring-4 focus:ring-sky-500/20 focus:border-sky-500 focus:outline-none shadow-inner"
+            className="w-full pl-12 pr-4 py-3 bg-slate-50 dark:bg-slate-800/80 border-2 border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-semibold text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-sky-500"
           />
-          <Search className="w-5 h-5 text-slate-400 absolute left-4 top-4" />
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
           <button
             type="button"
             onClick={() => setFilterType("ALL")}
-            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer whitespace-nowrap ${
+            className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition-all cursor-pointer flex-shrink-0 ${
               filterType === "ALL"
-                ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-sm"
-                : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200"
+                ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-sm"
+                : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 hover:bg-slate-200"
             }`}
           >
             Wszystkie ({reports.length})
@@ -122,151 +148,176 @@ export function ReportArchive({
           <button
             type="button"
             onClick={() => setFilterType("START_SHIFT")}
-            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer whitespace-nowrap ${
+            className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition-all cursor-pointer flex-shrink-0 ${
               filterType === "START_SHIFT"
-                ? "bg-sky-600 text-white shadow-md shadow-sky-600/30"
-                : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200"
+                ? "bg-sky-600 text-white shadow-sm"
+                : "bg-sky-50 text-sky-700 dark:bg-sky-950/50 dark:text-sky-400 hover:bg-sky-100"
             }`}
           >
-            Rozpoczęcie ({reports.filter((r) => r.reportType === "START_SHIFT").length})
+            Rozpoczęcie prac
           </button>
           <button
             type="button"
             onClick={() => setFilterType("END_SHIFT")}
-            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer whitespace-nowrap ${
+            className={`px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition-all cursor-pointer flex-shrink-0 ${
               filterType === "END_SHIFT"
-                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
-                : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200"
+                ? "bg-indigo-600 text-white shadow-sm"
+                : "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-400 hover:bg-indigo-100"
             }`}
           >
-            Zakończenie ({reports.filter((r) => r.reportType === "END_SHIFT").length})
+            Fotorelacja końcowa
           </button>
         </div>
       </div>
 
       {/* LISTA RAPORTÓW */}
       {filteredReports.length === 0 ? (
-        <div className="p-12 bg-white dark:bg-slate-900 border-2 border-dashed border-slate-300 dark:border-slate-800 rounded-3xl text-center space-y-3 shadow-sm">
-          <FileText className="w-12 h-12 text-slate-400 mx-auto" />
-          <div className="text-slate-900 dark:text-white text-lg font-black">
+        <div className="bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 rounded-3xl p-12 text-center space-y-3">
+          <div className="w-16 h-16 rounded-3xl bg-slate-100 dark:bg-slate-800 text-slate-400 mx-auto flex items-center justify-center">
+            <Filter className="w-8 h-8" />
+          </div>
+          <h3 className="font-black text-lg text-slate-800 dark:text-white">
             Brak raportów spełniających kryteria
-          </div>
-          <div className="text-slate-500 text-sm font-medium">
-            Wygeneruj swój pierwszy raport odprawy rozpoczęcia lub fotorelację zakończenia robót.
-          </div>
+          </h3>
+          <p className="text-xs text-slate-500 max-w-sm mx-auto">
+            Nie znaleziono raportów w archiwum dla podanej frazy lub wybranego filtra.
+          </p>
         </div>
       ) : (
         <div className="space-y-4">
-          {filteredReports.map((report) => (
-            <div
-              key={report.id}
-              className="bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 rounded-3xl p-5 sm:p-6 shadow-md hover:border-slate-300 dark:hover:border-slate-700 transition-all flex flex-col md:flex-row md:items-center justify-between gap-5"
-            >
-              <div className="space-y-2.5">
-                <div className="flex flex-wrap items-center gap-2.5">
-                  <span
-                    className={`px-3 py-1 text-xs sm:text-sm font-black rounded-xl uppercase tracking-wider ${
-                      report.reportType === "START_SHIFT"
-                        ? "bg-sky-100 text-sky-900 dark:bg-sky-950/80 dark:text-sky-300 border border-sky-300 dark:border-sky-700"
-                        : "bg-indigo-100 text-indigo-900 dark:bg-indigo-950/80 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-700"
-                    }`}
-                  >
-                    {report.reportType === "START_SHIFT"
-                      ? "Rozpoczęcie prac"
-                      : "Zakończenie prac"}
-                  </span>
-                  <div className="flex items-center gap-1.5 text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-mono font-bold">
-                    <Calendar className="w-4 h-4" />
-                    <span>
-                      {report.date} | {formatPolishTime(report.time)}
+          {filteredReports.map((report) => {
+            const isStart = report.reportType === "START_SHIFT";
+            return (
+              <div
+                key={report.id}
+                className="bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 rounded-3xl p-5 sm:p-6 shadow-sm hover:shadow-md transition-all space-y-4"
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-white shadow-md flex-shrink-0 ${
+                        isStart ? "bg-sky-600" : "bg-indigo-600"
+                      }`}
+                    >
+                      {isStart ? (
+                        <FileText className="w-6 h-6" />
+                      ) : (
+                        <Camera className="w-6 h-6" />
+                      )}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider ${
+                            isStart
+                              ? "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300"
+                              : "bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300"
+                          }`}
+                        >
+                          {isStart ? "Rozpoczęcie prac" : "Zakończenie prac"}
+                        </span>
+                        <span className="text-xs text-slate-400 font-mono">
+                          {report.date} | {report.time}
+                        </span>
+                      </div>
+                      <h3 className="font-black text-lg text-slate-900 dark:text-white mt-1">
+                        {report.siteName}
+                      </h3>
+                    </div>
+                  </div>
+
+                  {/* PRZYCISKI AKCJI DLA RAPORTU */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewReport(report)}
+                      className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-xs sm:text-sm font-bold transition-colors cursor-pointer"
+                    >
+                      <Eye className="w-4 h-4 text-sky-500" />
+                      <span>Szczegóły</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDownload(report)}
+                      className="flex items-center gap-2 px-4 py-2.5 bg-sky-50 hover:bg-sky-100 dark:bg-sky-950 dark:hover:bg-sky-900 text-sky-600 dark:text-sky-300 rounded-xl text-xs sm:text-sm font-bold transition-colors cursor-pointer"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>Pobierz PDF</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* METADANE RAPORTU */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-slate-100 dark:border-slate-800 text-xs">
+                  <div>
+                    <span className="text-slate-400 font-bold block">Brygadzista:</span>
+                    <span className="font-extrabold text-slate-800 dark:text-slate-200 truncate block">
+                      {report.foremanName}
                     </span>
                   </div>
-                  <span className="inline-flex items-center text-xs text-emerald-600 font-extrabold bg-emerald-100 dark:bg-emerald-950 px-2.5 py-0.5 rounded-lg">
-                    <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Wysłano (PDF)
-                  </span>
-                </div>
 
-                <div className="text-lg sm:text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
-                  <Building2 className="w-5 h-5 text-slate-400" />
-                  <span>{report.siteName}</span>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-4 text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-semibold">
-                  <div className="flex items-center gap-1.5">
-                    <UserCheck className="w-4 h-4 text-sky-500" />
-                    <span>Brygadzista: <strong className="text-slate-900 dark:text-white">{report.foremanName}</strong></span>
+                  <div>
+                    <span className="text-slate-400 font-bold block">
+                      {isStart ? "Obecnych pracowników:" : "Załączonych zdjęć:"}
+                    </span>
+                    <span className="font-extrabold text-slate-800 dark:text-slate-200 block">
+                      {isStart
+                        ? `${report.attendanceList?.length || 0} osób z podpisem`
+                        : `${report.photoDocumentation?.length || 0} fotografii`}
+                    </span>
                   </div>
-                  {report.reportType === "START_SHIFT" && (
-                    <div>
-                      Obecność: <strong className="text-slate-900 dark:text-white">{report.attendanceList?.length || 0} osób</strong>
-                    </div>
-                  )}
-                  {report.reportType === "END_SHIFT" && (
-                    <div>
-                      Fotorelacja: <strong className="text-slate-900 dark:text-white">{report.photoDocumentation?.length || 0} zdjęć</strong>
-                    </div>
-                  )}
-                </div>
 
-                <div className="text-xs text-slate-400 font-mono">
-                  Plik: {report.pdfFileName}
+                  <div>
+                    <span className="text-slate-400 font-bold block">Status wysyłki:</span>
+                    <span className="inline-flex items-center gap-1 font-extrabold text-emerald-600 dark:text-emerald-400">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Wysłano e-mail</span>
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-slate-400 font-bold block">Plik raportu:</span>
+                    <span className="font-mono text-[11px] text-slate-500 truncate block">
+                      {report.pdfFileName}
+                    </span>
+                  </div>
                 </div>
               </div>
-
-              {/* PRZYCISKI AKCJI (DUŻE I WYRAŹNE) */}
-              <div className="flex items-center gap-3 self-end md:self-center">
-                <button
-                  type="button"
-                  onClick={() => setPreviewReport(report)}
-                  className="flex items-center gap-2 px-5 py-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-900 dark:text-white font-bold text-sm rounded-2xl transition-all cursor-pointer active:scale-95 border border-slate-200 dark:border-slate-700 shadow-sm"
-                >
-                  <Eye className="w-4 h-4" />
-                  <span>Szczegóły</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDownload(report)}
-                  className="flex items-center gap-2 px-5 py-3 bg-sky-600 hover:bg-sky-500 text-white font-black text-sm rounded-2xl shadow-lg shadow-sky-600/30 transition-all cursor-pointer active:scale-95"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>Pobierz PDF</span>
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
-      {/* MODAL PODGLĄDU SZCZEGÓŁÓW RAPORTU */}
+      {/* MODAL SZCZEGÓŁÓW RAPORTU */}
       {previewReport && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in"
-          onClick={() => setPreviewReport(null)}
-        >
-          <div
-            className="bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="px-6 py-5 bg-slate-900 text-white flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-sky-500/25 text-sky-400 rounded-xl">
-                  <FileText className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="font-black text-lg sm:text-xl text-white">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-fade-in">
+            <div className="p-6 border-b-2 border-slate-200 dark:border-slate-800 flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`px-3 py-1 rounded-full text-xs font-black uppercase ${
+                      previewReport.reportType === "START_SHIFT"
+                        ? "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300"
+                        : "bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300"
+                    }`}
+                  >
                     {previewReport.reportType === "START_SHIFT"
-                      ? "Raport Rozpoczęcia Prac"
-                      : "Raport Zakończenia Prac"}
-                  </h3>
-                  <p className="text-xs sm:text-sm text-slate-400 font-mono">
-                    {previewReport.pdfFileName}
-                  </p>
+                      ? "Rozpoczęcie prac"
+                      : "Fotorelacja końcowa"}
+                  </span>
+                  <span className="font-mono text-xs text-slate-400">
+                    {previewReport.date} {previewReport.time}
+                  </span>
                 </div>
+                <h3 className="font-black text-xl text-slate-900 dark:text-white mt-1">
+                  {previewReport.siteName}
+                </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setPreviewReport(null)}
-                className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors cursor-pointer"
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 <X className="w-6 h-6" />
               </button>
@@ -300,6 +351,7 @@ export function ReportArchive({
                 </div>
               </div>
 
+              {/* TEMATY BHP */}
               {previewReport.discussedTopics && previewReport.discussedTopics.length > 0 && (
                 <div>
                   <h4 className="font-black text-sm uppercase tracking-wider text-slate-900 dark:text-white mb-2">
@@ -318,6 +370,7 @@ export function ReportArchive({
                 </div>
               )}
 
+              {/* LISTA OBECNOŚCI */}
               {previewReport.attendanceList && previewReport.attendanceList.length > 0 && (
                 <div>
                   <h4 className="font-black text-sm uppercase tracking-wider text-slate-900 dark:text-white mb-2">
@@ -351,25 +404,52 @@ export function ReportArchive({
                 </div>
               )}
 
+              {/* DOKUMENTACJA FOTOGRAFICZNA Z ZOOMEM */}
               {previewReport.photoDocumentation && previewReport.photoDocumentation.length > 0 && (
                 <div>
-                  <h4 className="font-black text-sm uppercase tracking-wider text-slate-900 dark:text-white mb-2">
-                    Dokumentacja Fotograficzna:
-                  </h4>
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-black text-sm uppercase tracking-wider text-slate-900 dark:text-white">
+                      Dokumentacja Fotograficzna:
+                    </h4>
+                    <span className="text-[11px] font-bold text-sky-500 flex items-center gap-1">
+                      <ZoomIn className="w-3.5 h-3.5" />
+                      <span>Kliknij zdjęcie, aby powiększyć</span>
+                    </span>
+                  </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {previewReport.photoDocumentation.map((photo, idx) => (
                       <div
                         key={photo.id}
-                        className="border-2 border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden bg-slate-50 dark:bg-slate-800"
+                        onClick={() =>
+                          setZoomPhoto({
+                            url: photo.photoDataUrl,
+                            description: photo.description,
+                            takenAt: photo.takenAt,
+                            index: idx + 1,
+                            total: previewReport.photoDocumentation?.length || 1,
+                          })
+                        }
+                        className="group border-2 border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden bg-slate-50 dark:bg-slate-800 cursor-pointer hover:border-sky-500 transition-all hover:shadow-lg relative"
                       >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={photo.photoDataUrl}
-                          alt="Zdjęcie"
-                          className="w-full h-40 object-cover"
-                        />
-                        <div className="p-3 text-xs font-bold text-slate-800 dark:text-slate-200">
-                          {photo.description}
+                        <div className="relative h-44 bg-slate-950 overflow-hidden flex items-center justify-center">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={photo.photoDataUrl}
+                            alt={photo.description || `Zdjęcie #${idx + 1}`}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 text-white font-bold text-xs backdrop-blur-[2px]">
+                            <Maximize2 className="w-5 h-5 text-sky-400" />
+                            <span>Powiększ zdjęcie</span>
+                          </div>
+                          <div className="absolute top-2 left-2 bg-slate-900/80 text-white text-[10px] font-black px-2 py-0.5 rounded-md">
+                            #{idx + 1}
+                          </div>
+                        </div>
+                        <div className="p-3 text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center justify-between">
+                          <span className="truncate">{photo.description}</span>
+                          <ZoomIn className="w-4 h-4 text-slate-400 group-hover:text-sky-400 flex-shrink-0" />
                         </div>
                       </div>
                     ))}
@@ -398,6 +478,75 @@ export function ReportArchive({
                 Pobierz dokument PDF
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* FULLSCREEN LIGHTBOX / ZOOM MODAL */}
+      {zoomPhoto && (
+        <div
+          className="fixed inset-0 z-[60] bg-black/95 backdrop-blur-md flex flex-col items-center justify-between p-4 sm:p-6 animate-fade-in"
+          onClick={() => setZoomPhoto(null)}
+        >
+          {/* Pasek górny modala powiększenia */}
+          <div
+            className="w-full max-w-4xl flex items-center justify-between text-white py-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+              <span className="px-3 py-1 bg-sky-600 text-white text-xs font-black rounded-lg">
+                Zdjęcie {zoomPhoto.index} z {zoomPhoto.total}
+              </span>
+              {zoomPhoto.takenAt && (
+                <span className="text-xs text-slate-400 font-mono hidden sm:inline-block">
+                  Wykonano: {formatPolishTime(zoomPhoto.takenAt)}
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <a
+                href={zoomPhoto.url}
+                target="_blank"
+                rel="noreferrer"
+                title="Otwórz oryginalne zdjęcie w nowej karcie"
+                className="p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer flex items-center gap-1.5 text-xs font-bold"
+              >
+                <ExternalLink className="w-4 h-4" />
+                <span className="hidden sm:inline">Otwórz oryginał</span>
+              </a>
+              <button
+                type="button"
+                onClick={() => setZoomPhoto(null)}
+                title="Zamknij (Esc)"
+                className="p-2.5 rounded-xl bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+          </div>
+
+          {/* Zdjęcie w pełnej rozdzielczości */}
+          <div
+            className="flex-1 flex items-center justify-center w-full max-w-5xl my-auto p-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={zoomPhoto.url}
+              alt={zoomPhoto.description || "Powiększone zdjęcie"}
+              className="max-h-[78vh] max-w-[92vw] object-contain rounded-2xl shadow-2xl border-2 border-slate-800 animate-scale-in"
+            />
+          </div>
+
+          {/* Pasek dolny z opisem */}
+          <div
+            className="w-full max-w-2xl bg-slate-900/90 border border-slate-800 text-white px-5 py-3 rounded-2xl text-center shadow-xl backdrop-blur-sm"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-sm font-bold text-slate-200">
+              {zoomPhoto.description || "Brak opisu fotografii"}
+            </p>
           </div>
         </div>
       )}
