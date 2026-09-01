@@ -1,5 +1,5 @@
 -- ==============================================================================
--- RYCOS Shift Database Schema for Supabase (PostgreSQL)
+-- RYCOS Shift Database Schema for Supabase (PostgreSQL) & Storage Bucket
 -- Project: https://nippewqmdgcjdeftvmdz.supabase.co
 -- ==============================================================================
 
@@ -46,10 +46,10 @@ CREATE TABLE IF NOT EXISTS public.daily_reports (
     foreman_name TEXT NOT NULL,
     location JSONB DEFAULT '{}'::jsonb, -- { latitude, longitude, accuracy }
     discussed_topics JSONB DEFAULT '[]'::jsonb,
-    attendance_list JSONB DEFAULT '[]'::jsonb, -- pracownicy i podpisy odręczne
-    photo_documentation JSONB DEFAULT '[]'::jsonb, -- zdjęcia i opisy
+    attendance_list JSONB DEFAULT '[]'::jsonb, -- pracownicy i podpisy odręczne (lub CDN URLs)
+    photo_documentation JSONB DEFAULT '[]'::jsonb, -- zdjęcia i opisy (lub CDN URLs)
     pdf_file_name TEXT NOT NULL,
-    pdf_data_url TEXT,
+    pdf_data_url TEXT, -- CDN URL pliku PDF w Supabase Storage
     sent_to_emails JSONB DEFAULT '[]'::jsonb,
     sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     status TEXT NOT NULL DEFAULT 'SENT',
@@ -80,6 +80,28 @@ CREATE TABLE IF NOT EXISTS public.pdf_templates (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- ==============================================================================
+-- 7. SUPABASE STORAGE BUCKET: rycos-reports
+-- ==============================================================================
+
+-- Utwórz publiczny bucket 'rycos-reports' jeśli nie istnieje
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('rycos-reports', 'rycos-reports', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+-- Uprawnienia do pobierania i wrzucania plików (PDF, zdjęcia, podpisy)
+CREATE POLICY "Public Access for rycos-reports"
+ON storage.objects FOR SELECT
+USING (bucket_id = 'rycos-reports');
+
+CREATE POLICY "Allow Upload to rycos-reports"
+ON storage.objects FOR INSERT
+WITH CHECK (bucket_id = 'rycos-reports');
+
+CREATE POLICY "Allow Update in rycos-reports"
+ON storage.objects FOR UPDATE
+USING (bucket_id = 'rycos-reports');
 
 -- ==============================================================================
 -- INICJALNE DANE STARTOWE (SEED DATA)

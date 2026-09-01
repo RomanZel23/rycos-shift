@@ -46,6 +46,12 @@ export function ReportArchive({
   });
 
   const handleDownload = async (report: DailyReport) => {
+    // Jeśli plik PDF znajduje się już w Supabase Storage Bucket, pobierz bezpośrednio z CDN
+    if (report.pdfDataUrl && report.pdfDataUrl.startsWith("http")) {
+      window.open(report.pdfDataUrl, "_blank");
+      return;
+    }
+
     const result = await generateReportPDFAsync(report);
     const link = document.createElement("a");
     link.href = URL.createObjectURL(result.blob);

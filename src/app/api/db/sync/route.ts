@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseClient, isSupabaseConfigured } from "@/lib/supabase";
 import { User, ConstructionSite, DiscussedTopicTemplate, TenantSettings, DailyReport, PdfTemplate } from "@/types";
+import { optimizeReportForStorage, BUCKET_NAME } from "@/lib/supabase-storage";
 
 export async function GET() {
   try {
@@ -139,28 +140,31 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { action, report, users, sites, topics, settings, pdfTemplates } = body;
 
-    // 1. Zapis/Aktualizacja nowego raportu dziennego
+    // 1. Zapis/Aktualizacja nowego raportu dziennego (z optymalizacją Storage Bucket)
     if (action === "SAVE_REPORT" && report) {
+      // Optymalizacja: wyślij pliki PDF, zdjęcia i podpisy do bucketu rycos-reports
+      const optimized = await optimizeReportForStorage(report);
+
       const { error } = await supabase.from("daily_reports").upsert(
         {
-          id: report.id,
-          tenant_id: report.tenantId || "tenant-sb-tech-poznan",
-          report_type: report.reportType,
-          date: report.date,
-          time: report.time,
-          site_id: report.siteId,
-          site_name: report.siteName,
-          foreman_id: report.foremanId,
-          foreman_name: report.foremanName,
-          location: report.location || {},
-          discussed_topics: report.discussedTopics || [],
-          attendance_list: report.attendanceList || [],
-          photo_documentation: report.photoDocumentation || [],
-          pdf_file_name: report.pdfFileName,
-          pdf_data_url: report.pdfDataUrl,
-          sent_to_emails: report.sentToEmails || [],
-          sent_at: report.sentAt || new Date().toISOString(),
-          status: report.status || "SENT",
+          id: optimized.id,
+          tenant_id: optimized.tenantId || "tenant-sb-tech-poznan",
+          report_type: optimized.reportType,
+          date: optimized.date,
+          time: optimized.time,
+          site_id: optimized.siteId,
+          site_name: optimized.siteName,
+          foreman_id: optimized.foremanId,
+          foreman_name: optimized.foremanName,
+          location: optimized.location || {},
+          discussed_topics: optimized.discussedTopics || [],
+          attendance_list: optimized.attendanceList || [],
+          photo_documentation: optimized.photoDocumentation || [],
+          pdf_file_name: optimized.pdfFileName,
+          pdf_data_url: optimized.pdfDataUrl,
+          sent_to_emails: optimized.sentToEmails || [],
+          sent_at: optimized.sentAt || new Date().toISOString(),
+          status: optimized.status || "SENT",
         },
         { onConflict: "id" }
       );
@@ -170,7 +174,11 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: false, message: error.message }, { status: 500 });
       }
 
-      return NextResponse.json({ success: true, message: "Raport zapisany w bazie Supabase" });
+      return NextResponse.json({
+        success: true,
+        message: "Raport zapisany w bazie Supabase i przesłany do Storage Bucket",
+        optimizedReport: optimized,
+      });
     }
 
     // 2. Zapis/Synchronizacja Użytkowników
