@@ -38,8 +38,8 @@ export function generateStartShiftHtml(report: DailyReport, settings?: TenantSet
   const topicsHtml = (report.discussedTopics || [])
     .map(
       (topic, idx) => `
-      <div style="display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; background-color: #f8fafc; border-left: 3px solid #0284c7; padding: 8px 12px; border-radius: 0 6px 6px 0;">
-        <span style="background-color: #0284c7; color: #ffffff; width: 20px; height: 20px; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; flex-shrink: 0; margin-top: 1px;">
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px; background-color: #f8fafc; border-left: 3px solid #0284c7; padding: 8px 12px; border-radius: 0 6px 6px 0;">
+        <span style="background-color: #0284c7; color: #ffffff; width: 22px; height: 22px; line-height: 22px; border-radius: 4px; display: inline-block; text-align: center; font-size: 11px; font-weight: 800; flex-shrink: 0;">
           ${idx + 1}
         </span>
         <span style="font-size: 12px; font-weight: 600; color: #1e293b; line-height: 1.4;">
@@ -60,10 +60,10 @@ export function generateStartShiftHtml(report: DailyReport, settings?: TenantSet
           idx + 1
         }</td>
         <td style="padding: 8px 10px; font-size: 12px; font-weight: 700; color: #0f172a;">
-          ${escapeHtml(att.userName)}
+          <span>${escapeHtml(att.userName)}</span>
           ${
             att.isForeman
-              ? '<span style="display: inline-block; margin-left: 6px; padding: 2px 6px; background-color: #f59e0b; color: #0f172a; font-size: 8px; font-weight: 800; border-radius: 4px;">BRYGADZISTA</span>'
+              ? '<span style="display: inline-block; margin-left: 8px; padding: 2px 7px; line-height: 12px; background-color: #f59e0b; color: #0f172a; font-size: 8.5px; font-weight: 900; border-radius: 4px; vertical-align: middle; text-align: center;">BRYGADZISTA</span>'
               : ""
           }
         </td>
@@ -105,7 +105,7 @@ export function generateStartShiftHtml(report: DailyReport, settings?: TenantSet
         </div>
 
         <!-- 2. TYTUŁ DOKUMENTU I METADANE -->
-        <div style="display: flex; justify-content: space-between; align-items: flex-end; background-color: #0f172a; color: #ffffff; padding: 14px 20px; border-radius: 8px; margin-bottom: 18px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; background-color: #0f172a; color: #ffffff; padding: 14px 20px; border-radius: 8px; margin-bottom: 18px;">
           <div>
             <div style="font-size: 9px; font-weight: 800; color: #38bdf8; text-transform: uppercase; letter-spacing: 1px;">SYSTEM RAPORTOWANIA PRAC • RYCOS SHIFT</div>
             <div style="font-size: 16px; font-weight: 900; letter-spacing: 0.5px; color: #ffffff; margin-top: 2px;">PROTOKÓŁ ROZPOCZĘCIA PRAC ZESPOŁU</div>
@@ -143,7 +143,7 @@ export function generateStartShiftHtml(report: DailyReport, settings?: TenantSet
                   }
                 </span>
               </div>
-              <span style="font-size: 9px; font-weight: 800; color: #0284c7; background-color: #e0f2fe; padding: 2px 8px; border-radius: 4px; border: 1px solid #bae6fd;">
+              <span style="display: inline-block; font-size: 9px; font-weight: 800; color: #0284c7; background-color: #e0f2fe; padding: 3px 8px; line-height: 12px; border-radius: 4px; border: 1px solid #bae6fd; text-align: center; vertical-align: middle;">
                 GPS ZWERYFIKOWANY
               </span>
             </div>
@@ -215,7 +215,7 @@ export function generateEndShiftHtml(report: DailyReport, settings?: TenantSetti
           <img src="${
             photo.photoDataUrl
           }" alt="Zdjęcie ${idx + 1}" style="width: 100%; height: 100%; object-fit: cover;" />
-          <span style="position: absolute; top: 6px; left: 6px; background-color: rgba(15, 23, 42, 0.85); color: #ffffff; font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 4px;">Zdjęcie #${
+          <span style="display: inline-block; position: absolute; top: 6px; left: 6px; background-color: rgba(15, 23, 42, 0.85); color: #ffffff; font-size: 9px; font-weight: 800; padding: 3px 8px; line-height: 12px; border-radius: 4px; text-align: center;">Zdjęcie #${
             idx + 1
           }</span>
         </div>
@@ -252,7 +252,7 @@ export function generateEndShiftHtml(report: DailyReport, settings?: TenantSetti
         </div>
 
         <!-- 2. TYTUŁ DOKUMENTU I METADANE -->
-        <div style="display: flex; justify-content: space-between; align-items: flex-end; background-color: #0f172a; color: #ffffff; padding: 14px 20px; border-radius: 8px; margin-bottom: 18px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; background-color: #0f172a; color: #ffffff; padding: 14px 20px; border-radius: 8px; margin-bottom: 18px;">
           <div>
             <div style="font-size: 9px; font-weight: 800; color: #818cf8; text-transform: uppercase; letter-spacing: 1px;">SYSTEM RAPORTOWANIA PRAC • RYCOS SHIFT</div>
             <div style="font-size: 16px; font-weight: 900; letter-spacing: 0.5px; color: #ffffff; margin-top: 2px;">PROTOKÓŁ ZAKOŃCZENIA PRAC (FOTORELACJA)</div>
@@ -290,7 +290,7 @@ export function generateEndShiftHtml(report: DailyReport, settings?: TenantSetti
                   }
                 </span>
               </div>
-              <span style="font-size: 9px; font-weight: 800; color: #4f46e5; background-color: #e0e7ff; padding: 2px 8px; border-radius: 4px; border: 1px solid #c7d2fe;">
+              <span style="display: inline-block; font-size: 9px; font-weight: 800; color: #4f46e5; background-color: #e0e7ff; padding: 3px 8px; line-height: 12px; border-radius: 4px; border: 1px solid #c7d2fe; text-align: center; vertical-align: middle;">
                 FOTORELACJA ZDAWCZA
               </span>
             </div>
