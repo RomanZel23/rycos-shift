@@ -67,6 +67,8 @@ export async function generateReportPDFAsync(
       const canvas = await html2canvas(container, {
         scale: 2,
         useCORS: true,
+        allowTaint: true,
+        imageTimeout: 15000,
         logging: false,
         backgroundColor: "#ffffff",
       });

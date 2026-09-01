@@ -3,7 +3,7 @@ import { formatPolishTime, formatPolishDateTime } from "./date-utils";
 
 /**
  * Szablon HTML dla Raportu Rozpoczęcia Prac (Start Shift)
- * Odwzorowuje oficjalny papier firmowy iDream Business Center & SolutionsBay (Kielce)
+ * Odwzorowuje oficjalny papier firmowy z plikami graficznymi /idream.png i /sb-logo.svg
  */
 export function generateStartShiftHtml(report: DailyReport, settings?: TenantSettings): string {
   const topicsHtml = (report.discussedTopics || [])
@@ -60,28 +60,17 @@ export function generateStartShiftHtml(report: DailyReport, settings?: TenantSet
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; width: 794px; min-height: 1123px; background-color: #ffffff; color: #0f172a; padding: 36px 44px; box-sizing: border-box; position: relative; display: flex; flex-direction: column; justify-content: space-between;">
       
       <div>
-        <!-- 1. OFICJALNY NAGŁÓWEK PAPIERU FIRMOWEGO (iDream / SolutionsBay) -->
+        <!-- 1. OFICJALNY NAGŁÓWEK PAPIERU FIRMOWEGO (idream.png / sb-logo.svg) -->
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 16px; margin-bottom: 20px;">
           
-          <!-- Logo Lewe: iDream | Business Center -->
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <span style="font-size: 26px; font-weight: 900; color: #1e3a8a; letter-spacing: -0.5px;">iDream</span>
-            <div style="width: 1.5px; height: 26px; background-color: #94a3b8; margin: 0 4px;"></div>
-            <div style="display: flex; flex-direction: column; font-size: 9px; font-weight: 800; color: #475569; line-height: 1.1; text-transform: uppercase; letter-spacing: 0.5px;">
-              <span>Business</span>
-              <span>Center</span>
-            </div>
+          <!-- Logo Lewe: iDream Business Center (idream.png) -->
+          <div style="display: flex; align-items: center;">
+            <img src="/idream.png" alt="iDream Business Center" style="height: 38px; max-width: 230px; object-fit: contain; display: block;" />
           </div>
 
-          <!-- Logo Prawe: SolutionsBay (Żuraw Origami) -->
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <svg width="26" height="26" viewBox="0 0 32 32" fill="none" style="display: block;">
-              <polygon points="16,2 6,12 16,22 26,12" fill="#0284c7" />
-              <polygon points="6,12 16,22 16,30" fill="#f97316" />
-              <polygon points="26,12 16,22 16,30" fill="#ef4444" />
-              <polygon points="16,2 26,12 16,22" fill="#38bdf8" />
-            </svg>
-            <span style="font-size: 22px; font-weight: 900; color: #0f172a; letter-spacing: -0.5px;">Solutions<span style="color: #0284c7;">Bay</span></span>
+          <!-- Logo Prawe: SolutionsBay (sb-logo.svg) -->
+          <div style="display: flex; align-items: center;">
+            <img src="/sb-logo.svg" alt="SolutionsBay" style="height: 32px; max-width: 220px; object-fit: contain; display: block;" />
           </div>
 
         </div>
@@ -187,7 +176,7 @@ export function generateStartShiftHtml(report: DailyReport, settings?: TenantSet
 
 /**
  * Szablon HTML dla Raportu Zakończenia Prac (End Shift - Fotorelacja)
- * Odwzorowuje oficjalny papier firmowy iDream Business Center & SolutionsBay (Kielce)
+ * Odwzorowuje oficjalny papier firmowy z plikami graficznymi /idream.png i /sb-logo.svg
  */
 export function generateEndShiftHtml(report: DailyReport, settings?: TenantSettings): string {
   const photosHtml = (report.photoDocumentation || [])
@@ -219,28 +208,17 @@ export function generateEndShiftHtml(report: DailyReport, settings?: TenantSetti
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; width: 794px; min-height: 1123px; background-color: #ffffff; color: #0f172a; padding: 36px 44px; box-sizing: border-box; position: relative; display: flex; flex-direction: column; justify-content: space-between;">
       
       <div>
-        <!-- 1. OFICJALNY NAGŁÓWEK PAPIERU FIRMOWEGO (iDream / SolutionsBay) -->
+        <!-- 1. OFICJALNY NAGŁÓWEK PAPIERU FIRMOWEGO (idream.png / sb-logo.svg) -->
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 16px; margin-bottom: 20px;">
           
-          <!-- Logo Lewe: iDream | Business Center -->
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <span style="font-size: 26px; font-weight: 900; color: #1e3a8a; letter-spacing: -0.5px;">iDream</span>
-            <div style="width: 1.5px; height: 26px; background-color: #94a3b8; margin: 0 4px;"></div>
-            <div style="display: flex; flex-direction: column; font-size: 9px; font-weight: 800; color: #475569; line-height: 1.1; text-transform: uppercase; letter-spacing: 0.5px;">
-              <span>Business</span>
-              <span>Center</span>
-            </div>
+          <!-- Logo Lewe: iDream Business Center (idream.png) -->
+          <div style="display: flex; align-items: center;">
+            <img src="/idream.png" alt="iDream Business Center" style="height: 38px; max-width: 230px; object-fit: contain; display: block;" />
           </div>
 
-          <!-- Logo Prawe: SolutionsBay (Żuraw Origami) -->
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <svg width="26" height="26" viewBox="0 0 32 32" fill="none" style="display: block;">
-              <polygon points="16,2 6,12 16,22 26,12" fill="#0284c7" />
-              <polygon points="6,12 16,22 16,30" fill="#f97316" />
-              <polygon points="26,12 16,22 16,30" fill="#ef4444" />
-              <polygon points="16,2 26,12 16,22" fill="#38bdf8" />
-            </svg>
-            <span style="font-size: 22px; font-weight: 900; color: #0f172a; letter-spacing: -0.5px;">Solutions<span style="color: #0284c7;">Bay</span></span>
+          <!-- Logo Prawe: SolutionsBay (sb-logo.svg) -->
+          <div style="display: flex; align-items: center;">
+            <img src="/sb-logo.svg" alt="SolutionsBay" style="height: 32px; max-width: 220px; object-fit: contain; display: block;" />
           </div>
 
         </div>
