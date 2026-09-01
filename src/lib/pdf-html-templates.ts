@@ -32,6 +32,54 @@ const SB_LOGO_INLINE_SVG = `
 `;
 
 /**
+ * Pomocnicze wektorowe plakietki (gwarantują 100% idealne wyśrodkowanie pionowe i poziome w html2canvas)
+ */
+function renderNumberBadge(num: number): string {
+  return `
+    <svg width="22" height="22" viewBox="0 0 22 22" style="display: block; flex-shrink: 0;">
+      <rect width="22" height="22" rx="4" fill="#0284c7" />
+      <text x="11" y="11" fill="#ffffff" font-size="11" font-weight="900" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" text-anchor="middle" dominant-baseline="central">${num}</text>
+    </svg>
+  `;
+}
+
+function renderForemanBadge(): string {
+  return `
+    <svg width="84" height="18" viewBox="0 0 84 18" style="display: inline-block; vertical-align: middle; margin-left: 8px;">
+      <rect width="84" height="18" rx="4" fill="#f59e0b" />
+      <text x="42" y="9" fill="#0f172a" font-size="8.5" font-weight="900" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" text-anchor="middle" dominant-baseline="central" letter-spacing="0.5">BRYGADZISTA</text>
+    </svg>
+  `;
+}
+
+function renderGpsBadge(): string {
+  return `
+    <svg width="128" height="22" viewBox="0 0 128 22" style="display: block;">
+      <rect x="0.5" y="0.5" width="127" height="21" rx="4" fill="#e0f2fe" stroke="#bae6fd" stroke-width="1" />
+      <text x="64" y="11" fill="#0284c7" font-size="9" font-weight="900" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" text-anchor="middle" dominant-baseline="central" letter-spacing="0.5">GPS ZWERYFIKOWANY</text>
+    </svg>
+  `;
+}
+
+function renderPhotoDocBadge(): string {
+  return `
+    <svg width="138" height="22" viewBox="0 0 138 22" style="display: block;">
+      <rect x="0.5" y="0.5" width="137" height="21" rx="4" fill="#e0e7ff" stroke="#c7d2fe" stroke-width="1" />
+      <text x="69" y="11" fill="#4f46e5" font-size="9" font-weight="900" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" text-anchor="middle" dominant-baseline="central" letter-spacing="0.5">FOTORELACJA ZDAWCZA</text>
+    </svg>
+  `;
+}
+
+function renderPhotoNumberBadge(idx: number): string {
+  return `
+    <svg width="72" height="20" viewBox="0 0 72 20" style="position: absolute; top: 6px; left: 6px; display: block;">
+      <rect width="72" height="20" rx="4" fill="rgba(15, 23, 42, 0.85)" />
+      <text x="36" y="10" fill="#ffffff" font-size="9" font-weight="900" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" text-anchor="middle" dominant-baseline="central">Zdjęcie #${idx + 1}</text>
+    </svg>
+  `;
+}
+
+/**
  * Szablon HTML dla Raportu Rozpoczęcia Prac (Start Shift)
  */
 export function generateStartShiftHtml(report: DailyReport, settings?: TenantSettings): string {
@@ -39,9 +87,7 @@ export function generateStartShiftHtml(report: DailyReport, settings?: TenantSet
     .map(
       (topic, idx) => `
       <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px; background-color: #f8fafc; border-left: 3px solid #0284c7; padding: 8px 12px; border-radius: 0 6px 6px 0;">
-        <span style="background-color: #0284c7; color: #ffffff; width: 22px; height: 22px; line-height: 22px; border-radius: 4px; display: inline-block; text-align: center; font-size: 11px; font-weight: 800; flex-shrink: 0;">
-          ${idx + 1}
-        </span>
+        ${renderNumberBadge(idx + 1)}
         <span style="font-size: 12px; font-weight: 600; color: #1e293b; line-height: 1.4;">
           ${escapeHtml(topic)}
         </span>
@@ -61,11 +107,7 @@ export function generateStartShiftHtml(report: DailyReport, settings?: TenantSet
         }</td>
         <td style="padding: 8px 10px; font-size: 12px; font-weight: 700; color: #0f172a;">
           <span>${escapeHtml(att.userName)}</span>
-          ${
-            att.isForeman
-              ? '<span style="display: inline-block; margin-left: 8px; padding: 2px 7px; line-height: 12px; background-color: #f59e0b; color: #0f172a; font-size: 8.5px; font-weight: 900; border-radius: 4px; vertical-align: middle; text-align: center;">BRYGADZISTA</span>'
-              : ""
-          }
+          ${att.isForeman ? renderForemanBadge() : ""}
         </td>
         <td style="padding: 8px 10px; font-size: 11px; color: #334155;">${escapeHtml(
           att.userRole
@@ -143,9 +185,9 @@ export function generateStartShiftHtml(report: DailyReport, settings?: TenantSet
                   }
                 </span>
               </div>
-              <span style="display: inline-block; font-size: 9px; font-weight: 800; color: #0284c7; background-color: #e0f2fe; padding: 3px 8px; line-height: 12px; border-radius: 4px; border: 1px solid #bae6fd; text-align: center; vertical-align: middle;">
-                GPS ZWERYFIKOWANY
-              </span>
+              <div>
+                ${renderGpsBadge()}
+              </div>
             </div>
           </div>
         </div>
@@ -215,9 +257,7 @@ export function generateEndShiftHtml(report: DailyReport, settings?: TenantSetti
           <img src="${
             photo.photoDataUrl
           }" alt="Zdjęcie ${idx + 1}" style="width: 100%; height: 100%; object-fit: cover;" />
-          <span style="display: inline-block; position: absolute; top: 6px; left: 6px; background-color: rgba(15, 23, 42, 0.85); color: #ffffff; font-size: 9px; font-weight: 800; padding: 3px 8px; line-height: 12px; border-radius: 4px; text-align: center;">Zdjęcie #${
-            idx + 1
-          }</span>
+          ${renderPhotoNumberBadge(idx)}
         </div>
         <div style="padding: 10px 12px; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
           <div style="font-size: 11px; font-weight: 700; color: #1e293b; line-height: 1.35;">${escapeHtml(
@@ -290,9 +330,9 @@ export function generateEndShiftHtml(report: DailyReport, settings?: TenantSetti
                   }
                 </span>
               </div>
-              <span style="display: inline-block; font-size: 9px; font-weight: 800; color: #4f46e5; background-color: #e0e7ff; padding: 3px 8px; line-height: 12px; border-radius: 4px; border: 1px solid #c7d2fe; text-align: center; vertical-align: middle;">
-                FOTORELACJA ZDAWCZA
-              </span>
+              <div>
+                ${renderPhotoDocBadge()}
+              </div>
             </div>
           </div>
         </div>
