@@ -17,6 +17,8 @@ import {
   ZoomIn,
   ExternalLink,
   Maximize2,
+  RefreshCw,
+  Database,
 } from "lucide-react";
 import { DailyReport } from "@/types";
 import { generateReportPDFAsync } from "@/lib/pdf-generator";
@@ -26,6 +28,9 @@ interface ReportArchiveProps {
   reports: DailyReport[];
   onNewStartReport: () => void;
   onNewEndReport: () => void;
+  onRefresh?: () => Promise<void>;
+  isSyncing?: boolean;
+  isSupabaseConnected?: boolean;
 }
 
 interface ZoomPhotoData {
@@ -40,6 +45,9 @@ export function ReportArchive({
   reports,
   onNewStartReport,
   onNewEndReport,
+  onRefresh,
+  isSyncing = false,
+  isSupabaseConnected = true,
 }: ReportArchiveProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<string>("ALL");
@@ -131,19 +139,49 @@ export function ReportArchive({
       {/* NAGŁÓWEK ARCHIWUM */}
       <div className="bg-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-5 border border-slate-800">
         <div>
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-sky-500/25 text-sky-300 text-xs sm:text-sm font-black uppercase tracking-wider mb-2.5 border border-sky-500/40">
-            <FileText className="w-4 h-4" />
-            <span>Repozytorium Raportów</span>
+          <div className="flex flex-wrap items-center gap-2 mb-2.5">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-sky-500/25 text-sky-300 text-xs sm:text-sm font-black uppercase tracking-wider border border-sky-500/40">
+              <FileText className="w-4 h-4" />
+              <span>Repozytorium Raportów</span>
+            </div>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-800 border border-slate-700 text-[11px] font-bold">
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  isSupabaseConnected ? "bg-emerald-400 animate-pulse" : "bg-amber-400"
+                }`}
+              />
+              <span className={isSupabaseConnected ? "text-emerald-300" : "text-amber-300"}>
+                {isSupabaseConnected ? "Baza Supabase (Live)" : "Lokalna kopia"}
+              </span>
+            </div>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
             Archiwum Raportów
           </h1>
           <p className="text-sm text-slate-300 font-semibold mt-1">
-            Historia odpraw i fotorelacji z budów • Pliki PDF w chmurze
+            Historia odpraw i fotorelacji z budów • Pliki PDF w Supabase Storage
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
+          {onRefresh && (
+            <button
+              type="button"
+              onClick={onRefresh}
+              disabled={isSyncing}
+              title="Pobierz najświeższe dane z bazy danych w chmurze"
+              className="flex items-center justify-center gap-2 px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold text-sm rounded-2xl border border-slate-700 shadow-md transition-all cursor-pointer active:scale-95 disabled:opacity-60"
+            >
+              <RefreshCw
+                className={`w-4 h-4 ${
+                  isSyncing ? "animate-spin text-sky-400" : "text-slate-300"
+                }`}
+              />
+              <span className="hidden sm:inline">
+                {isSyncing ? "Pobieranie..." : "Odśwież bazę"}
+              </span>
+            </button>
+          )}
           <button
             type="button"
             onClick={onNewStartReport}

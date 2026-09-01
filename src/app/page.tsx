@@ -40,7 +40,7 @@ import {
 export default function Home() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("START_SHIFT");
 
-  // Główne stany aplikacji zainicjalizowane od razu danymi startowymi (brak blokowania na loaderze)
+  // Główne stany aplikacji zainicjalizowane od razu danymi startowymi
   const [users, setUsers] = useState<User[]>(INITIAL_USERS);
   const [sites, setSites] = useState<ConstructionSite[]>(INITIAL_SITES);
   const [topics, setTopics] = useState<DiscussedTopicTemplate[]>(INITIAL_TOPIC_TEMPLATES);
@@ -51,15 +51,85 @@ export default function Home() {
   // Stan autentykacji / zalogowanego użytkownika
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
+  // Stan synchronizacji z bazą Supabase
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [isSupabaseConnected, setIsSupabaseConnected] = useState(true);
+
+  // Funkcja pobierania najświeższych danych z bazy danych Supabase
+  const syncWithDatabase = useCallback(async () => {
+    try {
+      setIsSyncing(true);
+      const res = await fetch("/api/db/sync");
+      const resJson = await res.json();
+      if (resJson.success && resJson.isConnected && resJson.data) {
+        setIsSupabaseConnected(true);
+        const {
+          users: dbUsers,
+          sites: dbSites,
+          topics: dbTopics,
+          settings: dbSettings,
+          reports: dbReports,
+          pdfTemplates: dbTemplates,
+        } = resJson.data;
+
+        if (dbUsers && dbUsers.length > 0) {
+          setUsers(dbUsers);
+          saveStoredUsers(dbUsers);
+          const loggedUser = getStoredLoggedUser();
+          if (loggedUser) {
+            const updatedCurrent = dbUsers.find((u: User) => u.id === loggedUser.id);
+            if (updatedCurrent) {
+              setCurrentUser(updatedCurrent);
+              setStoredLoggedUser(updatedCurrent);
+            }
+          }
+        }
+        if (dbSites && dbSites.length > 0) {
+          setSites(dbSites);
+          saveStoredSites(dbSites);
+        }
+        if (dbTopics && dbTopics.length > 0) {
+          setTopics(dbTopics);
+          saveStoredTopics(dbTopics);
+        }
+        if (dbSettings) {
+          setSettings(dbSettings);
+          saveStoredSettings(dbSettings);
+        }
+        if (dbReports) {
+          setReports(dbReports);
+          try {
+            localStorage.setItem("rycos_shift_reports_v1", JSON.stringify(dbReports));
+          } catch {}
+        }
+        if (dbTemplates && dbTemplates.length > 0) {
+          setPdfTemplates(dbTemplates);
+          saveStoredPdfTemplates(dbTemplates);
+        }
+      } else {
+        setIsSupabaseConnected(resJson.isConnected ?? false);
+      }
+    } catch (err) {
+      console.warn("Supabase background sync skipped (offline or unconfigured):", err);
+      setIsSupabaseConnected(false);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, []);
+
   // Obsługa nawigacji 'Wstecz' na Androidzie (PWA / Browser History)
   const handleTabChange = useCallback((newTab: ActiveTab, pushHistory = true) => {
     setActiveTab(newTab);
     if (pushHistory && typeof window !== "undefined") {
       window.history.pushState({ tab: newTab }, "");
     }
-  }, []);
+    // Gdy użytkownik wchodzi do Archiwum, natychmiast odśwież z bazy Supabase
+    if (newTab === "ARCHIVE") {
+      syncWithDatabase();
+    }
+  }, [syncWithDatabase]);
 
-  // Inicjalizacja z localStorage i synchronizacja w tle
+  // Inicjalizacja z localStorage i synchronizacja w tle przy starcie
   useEffect(() => {
     try {
       const loadedUsers = getStoredUsers();
@@ -88,6 +158,9 @@ export default function Home() {
       const handlePopState = (e: PopStateEvent) => {
         if (e.state && e.state.tab) {
           setActiveTab(e.state.tab);
+          if (e.state.tab === "ARCHIVE") {
+            syncWithDatabase();
+          }
         } else if (!e.state || !e.state.modal) {
           setActiveTab("START_SHIFT");
         }
@@ -97,62 +170,8 @@ export default function Home() {
       return () => window.removeEventListener("popstate", handlePopState);
     }
 
-    // Automatyczna synchronizacja z Supabase (w tle)
-    const syncWithDatabase = async () => {
-      try {
-        const res = await fetch("/api/db/sync");
-        const resJson = await res.json();
-        if (resJson.success && resJson.isConnected && resJson.data) {
-          const {
-            users: dbUsers,
-            sites: dbSites,
-            topics: dbTopics,
-            settings: dbSettings,
-            reports: dbReports,
-            pdfTemplates: dbTemplates,
-          } = resJson.data;
-          if (dbUsers && dbUsers.length > 0) {
-            setUsers(dbUsers);
-            saveStoredUsers(dbUsers);
-            const loggedUser = getStoredLoggedUser();
-            if (loggedUser) {
-              const updatedCurrent = dbUsers.find((u: User) => u.id === loggedUser.id);
-              if (updatedCurrent) {
-                setCurrentUser(updatedCurrent);
-                setStoredLoggedUser(updatedCurrent);
-              }
-            }
-          }
-          if (dbSites && dbSites.length > 0) {
-            setSites(dbSites);
-            saveStoredSites(dbSites);
-          }
-          if (dbTopics && dbTopics.length > 0) {
-            setTopics(dbTopics);
-            saveStoredTopics(dbTopics);
-          }
-          if (dbSettings) {
-            setSettings(dbSettings);
-            saveStoredSettings(dbSettings);
-          }
-          if (dbReports && dbReports.length > 0) {
-            setReports(dbReports);
-            try {
-              localStorage.setItem("rycos_shift_reports_v1", JSON.stringify(dbReports));
-            } catch {}
-          }
-          if (dbTemplates && dbTemplates.length > 0) {
-            setPdfTemplates(dbTemplates);
-            saveStoredPdfTemplates(dbTemplates);
-          }
-        }
-      } catch (err) {
-        console.warn("Supabase background sync skipped (offline or unconfigured):", err);
-      }
-    };
-
     syncWithDatabase();
-  }, []);
+  }, [syncWithDatabase]);
 
   // Handlery logowania i wylogowania
   const handleLogin = (user: User) => {
@@ -289,6 +308,9 @@ export default function Home() {
             reports={reports}
             onNewStartReport={() => handleTabChange("START_SHIFT")}
             onNewEndReport={() => handleTabChange("END_SHIFT")}
+            onRefresh={syncWithDatabase}
+            isSyncing={isSyncing}
+            isSupabaseConnected={isSupabaseConnected}
           />
         )}
 
@@ -318,7 +340,7 @@ export default function Home() {
             System RYCOS Shift — Raportowanie odpraw i fotorelacji z budowy
           </div>
           <div className="font-mono text-[11px] text-slate-400">
-            Wersja 1.3 (PWA Android Back Support)
+            Wersja 1.3 (Supabase Cloud Sync)
           </div>
         </div>
       </footer>
