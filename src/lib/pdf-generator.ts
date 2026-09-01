@@ -149,13 +149,13 @@ export function generateReportPDF(report: DailyReport): PDFGenerationResult {
 
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(16);
-  doc.text("SB TECHNOLOGY", margin + 6, currentY + 9);
+  doc.setFontSize(15);
+  doc.text("iDream | SolutionsBay", margin + 6, currentY + 9);
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   doc.setTextColor(203, 213, 225);
-  doc.text("SYSTEM RYCOS SHIFT | SOLUTIONSBAY", margin + 6, currentY + 16);
+  doc.text("PAPIER FIRMOWY • SYSTEM RYCOS SHIFT", margin + 6, currentY + 16);
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);

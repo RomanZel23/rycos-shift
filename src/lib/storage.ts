@@ -199,6 +199,7 @@ const STORAGE_KEYS = {
   REPORTS: "rycos_shift_reports_v1",
   TEMPLATES: "rycos_shift_templates_v1",
   CURRENT_USER_ID: "rycos_shift_current_user_v1",
+  LOGGED_USER: "rycos_shift_logged_user_v1",
 };
 
 export const getStoredUsers = (): User[] => {
@@ -353,4 +354,24 @@ export const getStoredPdfTemplates = (): PdfTemplate[] => {
 export const saveStoredPdfTemplates = (templates: PdfTemplate[]): void => {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_KEYS.TEMPLATES, JSON.stringify(templates));
+};
+
+export const getStoredLoggedUser = (): User | null => {
+  if (typeof window === "undefined") return null;
+  try {
+    const data = localStorage.getItem(STORAGE_KEYS.LOGGED_USER);
+    if (!data) return null;
+    return JSON.parse(data);
+  } catch {
+    return null;
+  }
+};
+
+export const setStoredLoggedUser = (user: User | null): void => {
+  if (typeof window === "undefined") return;
+  if (!user) {
+    localStorage.removeItem(STORAGE_KEYS.LOGGED_USER);
+  } else {
+    localStorage.setItem(STORAGE_KEYS.LOGGED_USER, JSON.stringify(user));
+  }
 };

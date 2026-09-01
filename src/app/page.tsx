@@ -6,6 +6,7 @@ import { StartShiftForm } from "@/components/StartShiftForm";
 import { EndShiftForm } from "@/components/EndShiftForm";
 import { ReportArchive } from "@/components/ReportArchive";
 import { AdminSettings } from "@/components/AdminSettings";
+import { LoginForm } from "@/components/LoginForm";
 import { PwaInstallPrompt } from "@/components/PwaInstallPrompt";
 import {
   User,
@@ -25,10 +26,10 @@ import {
   getStoredSettings,
   saveStoredSettings,
   getStoredReports,
-  getStoredCurrentUserId,
-  setStoredCurrentUserId,
   getStoredPdfTemplates,
   saveStoredPdfTemplates,
+  getStoredLoggedUser,
+  setStoredLoggedUser,
   INITIAL_PDF_TEMPLATES,
 } from "@/lib/storage";
 
@@ -50,7 +51,9 @@ export default function Home() {
   });
   const [reports, setReports] = useState<DailyReport[]>([]);
   const [pdfTemplates, setPdfTemplates] = useState<PdfTemplate[]>(INITIAL_PDF_TEMPLATES);
-  const [currentUserId, setCurrentUserId] = useState<string>("");
+  
+  // Stan autentykacji / zalogowanego użytkownika
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   // Inicjalizacja z localStorage
   useEffect(() => {
@@ -60,7 +63,7 @@ export default function Home() {
     const loadedSettings = getStoredSettings();
     const loadedReports = getStoredReports();
     const loadedTemplates = getStoredPdfTemplates();
-    const loadedCurrentUserId = getStoredCurrentUserId();
+    const loggedUser = getStoredLoggedUser();
 
     setUsers(loadedUsers);
     setSites(loadedSites);
@@ -68,7 +71,7 @@ export default function Home() {
     setSettings(loadedSettings);
     setReports(loadedReports);
     setPdfTemplates(loadedTemplates);
-    setCurrentUserId(loadedCurrentUserId);
+    setCurrentUser(loggedUser);
 
     setMounted(true);
 
@@ -89,6 +92,14 @@ export default function Home() {
           if (dbUsers && dbUsers.length > 0) {
             setUsers(dbUsers);
             saveStoredUsers(dbUsers);
+            // Zaktualizuj dane zalogowanego użytkownika jeśli zmieniły się w bazie
+            if (loggedUser) {
+              const updatedCurrent = dbUsers.find((u: User) => u.id === loggedUser.id);
+              if (updatedCurrent) {
+                setCurrentUser(updatedCurrent);
+                setStoredLoggedUser(updatedCurrent);
+              }
+            }
           }
           if (dbSites && dbSites.length > 0) {
             setSites(dbSites);
@@ -119,24 +130,22 @@ export default function Home() {
     syncWithDatabase();
   }, []);
 
-  const currentUser =
-    users.find((u) => u.id === currentUserId) ||
-    users[0] || {
-      id: "usr-admin-1",
-      firstName: "Marcin",
-      lastName: "Bajda",
-      role: "Kierownik Operacyjny",
-      isForeman: true,
-      isAdmin: true,
-      login: "m.bajda",
-      createdAt: new Date().toISOString(),
-    };
+  // Handlery logowania i wylogowania
+  const handleLogin = (user: User) => {
+    setCurrentUser(user);
+    setStoredLoggedUser(user);
+    setActiveTab("START_SHIFT");
+  };
 
-  // Handlery aktualizacji
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setStoredLoggedUser(null);
+    setActiveTab("START_SHIFT");
+  };
+
   const handleUserChange = (user: User) => {
-    setCurrentUserId(user.id);
-    setStoredCurrentUserId(user.id);
-    // Jeśli przełączono na nie-admina, a byliśmy w Ustawieniach, przejdź do Rozpoczęcia
+    setCurrentUser(user);
+    setStoredLoggedUser(user);
     if (!user.isAdmin && activeTab === "SETTINGS") {
       setActiveTab("START_SHIFT");
     }
@@ -205,9 +214,19 @@ export default function Home() {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white">
         <div className="w-12 h-12 border-4 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
-        <div className="mt-4 font-black text-lg tracking-wider text-sky-400">SB TECHNOLOGY</div>
+        <div className="mt-4 font-black text-lg tracking-wider text-sky-400">iDream | SolutionsBay</div>
         <div className="text-xs text-slate-400 mt-1">Ładowanie systemu RYCOS Shift...</div>
       </div>
+    );
+  }
+
+  // JEŚLI UŻYTKOWNIK NIE JEST ZALOGOWANY -> POKAŻ EKRAN LOGOWANIA
+  if (!currentUser) {
+    return (
+      <>
+        <PwaInstallPrompt />
+        <LoginForm users={users} onLogin={handleLogin} />
+      </>
     );
   }
 
@@ -216,13 +235,14 @@ export default function Home() {
       {/* BANER AUTOMATYCZNEJ INSTALACJI PWA */}
       <PwaInstallPrompt />
 
-      {/* NAGŁÓWEK SYSTEMU */}
+      {/* NAGŁÓWEK SYSTEMU Z PROFILEM I WYLOGOWANIEM */}
       <Header
         activeTab={activeTab}
         onTabChange={setActiveTab}
         currentUser={currentUser}
         allUsers={users}
         onUserChange={handleUserChange}
+        onLogout={handleLogout}
         settings={settings}
         reportsCount={reports.length}
       />
@@ -278,13 +298,13 @@ export default function Home() {
       <footer className="hidden sm:block border-t border-slate-200 dark:border-slate-800/80 py-6 text-center text-xs text-slate-500 bg-white/60 dark:bg-slate-900/60 mt-auto">
         <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <div>
-            <strong>RYCOS Shift</strong> • SB Technology Poznań
+            <strong>iDream Business Center</strong> • SolutionsBay Sp. z o.o.
           </div>
           <div>
-            System raportowania terenowego dla zespołów wykonawczych
+            System RYCOS Shift — Raportowanie odpraw i fotorelacji z budowy
           </div>
           <div className="font-mono text-[11px] text-slate-400">
-            Wersja 1.0 (Mobile Ready)
+            Wersja 1.2 (Papier Firmowy & Auth)
           </div>
         </div>
       </footer>

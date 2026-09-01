@@ -11,6 +11,7 @@ import {
   User as UserIcon,
   HardHat,
   ChevronDown,
+  LogOut,
 } from "lucide-react";
 import { User, TenantSettings } from "@/types";
 
@@ -22,6 +23,7 @@ interface HeaderProps {
   currentUser: User;
   allUsers: User[];
   onUserChange: (user: User) => void;
+  onLogout?: () => void;
   settings: TenantSettings;
   reportsCount: number;
 }
@@ -32,6 +34,7 @@ export function Header({
   currentUser,
   allUsers,
   onUserChange,
+  onLogout,
   settings,
   reportsCount,
 }: HeaderProps) {
@@ -54,23 +57,28 @@ export function Header({
     <header className="sticky top-0 z-40 bg-slate-900 border-b border-slate-800 text-white shadow-xl">
       <div className="max-w-6xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-18 sm:h-22">
-          {/* LOGOTYP & BRANDING */}
-          <div className="flex items-center gap-3">
-            {/* Sygnet / Ikona SB Technology */}
-            <div className="w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-gradient-to-tr from-sky-600 via-blue-600 to-indigo-500 flex items-center justify-center font-black text-white text-xl sm:text-2xl shadow-lg shadow-sky-500/25 border-2 border-white/20 flex-shrink-0">
-              SB
+          {/* LOGOTYP & BRANDING (iDream / SolutionsBay) */}
+          <div className="flex items-center gap-3.5">
+            {/* Sygnet SolutionsBay */}
+            <div className="w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-gradient-to-tr from-sky-600 via-blue-600 to-indigo-600 flex items-center justify-center font-black text-white text-xl sm:text-2xl shadow-lg shadow-sky-500/25 border-2 border-white/20 flex-shrink-0">
+              <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
+                <polygon points="16,2 6,12 16,22 26,12" fill="#ffffff" />
+                <polygon points="6,12 16,22 16,30" fill="#f97316" />
+                <polygon points="26,12 16,22 16,30" fill="#ef4444" />
+                <polygon points="16,2 26,12 16,22" fill="#38bdf8" />
+              </svg>
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-black text-lg sm:text-2xl tracking-wide text-white uppercase font-sans">
-                  {settings.logoText || "SB TECHNOLOGY"}
+                <span className="font-black text-lg sm:text-2xl tracking-wide text-white font-sans">
+                  RYCOS <span className="text-sky-400">Shift</span>
                 </span>
                 <span className="hidden sm:inline-block px-2.5 py-0.5 bg-sky-500/25 text-sky-300 text-xs font-black rounded-lg uppercase tracking-wider border border-sky-500/40">
-                  Poznań
+                  SolutionsBay
                 </span>
               </div>
               <p className="text-xs sm:text-sm text-slate-300 font-semibold">
-                {settings.logoSubtitle || "RYCOS Shift workflow"}
+                iDream Business Center • Raporty Budowy
               </p>
             </div>
           </div>
@@ -138,8 +146,8 @@ export function Header({
             )}
           </nav>
 
-          {/* PRZEŁĄCZNIK PROFILU UŻYTKOWNIKA (DUŻY I CZYTELNY) */}
-          <div className="relative">
+          {/* PROFIL UŻYTKOWNIKA I PRZYCISK WYLOGOWANIA */}
+          <div className="flex items-center gap-2 relative">
             <button
               type="button"
               onClick={() => setUserDropdownOpen(!userDropdownOpen)}
@@ -177,51 +185,60 @@ export function Header({
               <ChevronDown className="w-4 h-4 text-slate-400" />
             </button>
 
-            {/* DROPDOWN WYBORU UŻYTKOWNIKA */}
+            {/* SZYBKI PRZYCISK WYLOGUJ DLA DESKTOPU */}
+            {onLogout && (
+              <button
+                type="button"
+                onClick={onLogout}
+                title="Wyloguj z systemu"
+                className="hidden sm:flex p-2.5 bg-slate-800 hover:bg-rose-950/80 text-slate-400 hover:text-rose-300 border border-slate-700 hover:border-rose-700 rounded-2xl transition-colors cursor-pointer"
+              >
+                <LogOut className="w-5 h-5" />
+              </button>
+            )}
+
+            {/* DROPDOWN WYBORU UŻYTKOWNIKA I WYLOGOWANIA */}
             {userDropdownOpen && (
-              <div className="absolute right-0 mt-2 w-72 bg-slate-900 border-2 border-slate-700 rounded-2xl shadow-2xl p-2.5 z-50 animate-fade-in">
-                <div className="px-3 py-2 text-xs text-slate-400 font-bold uppercase tracking-wider border-b border-slate-800">
-                  Przełącz profil użytkownika:
+              <div className="absolute right-0 top-full mt-2 w-72 bg-slate-900 border-2 border-slate-700 rounded-3xl shadow-2xl p-3 z-50 animate-fade-in">
+                <div className="px-3 py-2 text-xs text-slate-400 font-bold uppercase tracking-wider border-b border-slate-800 flex items-center justify-between">
+                  <span>Profil użytkownika:</span>
+                  <span className="text-sky-400 font-mono">{currentTime}</span>
                 </div>
-                <div className="max-h-72 overflow-y-auto py-1 space-y-1.5">
-                  {allUsers.map((user) => (
+
+                <div className="p-3 my-1 bg-slate-800/80 rounded-2xl border border-slate-700">
+                  <div className="font-black text-white text-sm">
+                    {currentUser.firstName} {currentUser.lastName}
+                  </div>
+                  <div className="text-xs text-slate-400">{currentUser.role}</div>
+                  <div className="mt-2 flex items-center gap-1.5">
+                    {currentUser.isAdmin && (
+                      <span className="px-2 py-0.5 bg-amber-500/30 text-amber-300 text-[10px] font-black rounded-md border border-amber-500/40">
+                        ADMINISTRATOR
+                      </span>
+                    )}
+                    {currentUser.isForeman && (
+                      <span className="px-2 py-0.5 bg-sky-500/30 text-sky-300 text-[10px] font-black rounded-md border border-sky-500/40">
+                        BRYGADZISTA
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {onLogout && (
+                  <div className="pt-2 border-t border-slate-800">
                     <button
-                      key={user.id}
                       type="button"
                       onClick={() => {
-                        onUserChange(user);
                         setUserDropdownOpen(false);
+                        onLogout();
                       }}
-                      className={`w-full text-left px-3.5 py-2.5 rounded-xl text-sm flex items-center justify-between transition-colors cursor-pointer ${
-                        user.id === currentUser.id
-                          ? "bg-sky-600 text-white font-bold shadow-sm"
-                          : "text-slate-200 hover:bg-slate-800"
-                      }`}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white font-bold text-xs rounded-xl border border-rose-500/40 transition-colors cursor-pointer"
                     >
-                      <div>
-                        <div className="font-bold text-sm">
-                          {user.firstName} {user.lastName}
-                        </div>
-                        <div className="text-xs opacity-80">{user.role}</div>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        {user.isAdmin && (
-                          <span className="px-2 py-0.5 bg-amber-500/30 text-amber-300 text-[10px] font-black rounded-md">
-                            ADMIN
-                          </span>
-                        )}
-                        {user.isForeman && (
-                          <span className="px-2 py-0.5 bg-sky-500/30 text-sky-300 text-[10px] font-black rounded-md">
-                            BRYGADA
-                          </span>
-                        )}
-                      </div>
+                      <LogOut className="w-4 h-4" />
+                      <span>Wyloguj z konta</span>
                     </button>
-                  ))}
-                </div>
-                <div className="p-2.5 border-t border-slate-800 text-xs text-slate-400 text-center font-medium">
-                  Zegar: <strong className="text-sky-400 font-mono text-sm">{currentTime}</strong>
-                </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -286,6 +303,18 @@ export function Header({
           >
             <SettingsIcon className="w-6 h-6" />
             <span className="text-xs">Ustawienia</span>
+          </button>
+        )}
+
+        {/* PRZYCISK WYLOGOWANIA NA PASKU DOLNYM */}
+        {onLogout && (
+          <button
+            type="button"
+            onClick={onLogout}
+            className="flex flex-col items-center gap-1 py-2 px-3 rounded-2xl text-rose-400 hover:text-rose-300 font-bold transition-all cursor-pointer"
+          >
+            <LogOut className="w-6 h-6" />
+            <span className="text-xs">Wyjdź</span>
           </button>
         )}
       </div>
