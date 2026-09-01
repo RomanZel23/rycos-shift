@@ -175,15 +175,17 @@ export function generateStartShiftHtml(report: DailyReport, settings?: TenantSet
             <div style="grid-column: span 2; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #e2e8f0; padding-top: 8px; margin-top: 4px;">
               <div>
                 <span style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase;">Lokalizacja GPS: </span>
-                <span style="font-size: 11px; font-weight: 700; color: #334155; font-family: monospace;">
-                  ${
-                    report.location?.latitude
-                      ? `${report.location.latitude.toFixed(6)}° N, ${report.location.longitude?.toFixed(
-                          6
-                        )}° E (±${Math.round(report.location.accuracy || 0)}m)`
-                      : "52.406374° N, 16.925168° E"
-                  }
-                </span>
+                ${
+                  report.location?.latitude && report.location?.longitude
+                    ? `<a href="https://www.google.com/maps?q=${report.location.latitude},${
+                        report.location.longitude
+                      }" target="_blank" style="color: #0284c7; text-decoration: underline; font-family: monospace; font-size: 11px; font-weight: 700;">
+                        ${report.location.latitude.toFixed(6)}° N, ${report.location.longitude.toFixed(
+                        6
+                      )}° E (±${Math.round(report.location.accuracy || 0)}m)
+                      </a>`
+                    : '<span style="font-size: 11px; font-weight: 700; color: #334155; font-family: monospace;">52.406374° N, 16.925168° E</span>'
+                }
               </div>
               <div>
                 ${renderGpsBadge()}
@@ -320,15 +322,17 @@ export function generateEndShiftHtml(report: DailyReport, settings?: TenantSetti
             <div style="grid-column: span 2; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #e2e8f0; padding-top: 8px; margin-top: 4px;">
               <div>
                 <span style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase;">Lokalizacja GPS: </span>
-                <span style="font-size: 11px; font-weight: 700; color: #334155; font-family: monospace;">
-                  ${
-                    report.location?.latitude
-                      ? `${report.location.latitude.toFixed(6)}° N, ${report.location.longitude?.toFixed(
-                          6
-                        )}° E (±${Math.round(report.location.accuracy || 0)}m)`
-                      : "52.406374° N, 16.925168° E"
-                  }
-                </span>
+                ${
+                  report.location?.latitude && report.location?.longitude
+                    ? `<a href="https://www.google.com/maps?q=${report.location.latitude},${
+                        report.location.longitude
+                      }" target="_blank" style="color: #4f46e5; text-decoration: underline; font-family: monospace; font-size: 11px; font-weight: 700;">
+                        ${report.location.latitude.toFixed(6)}° N, ${report.location.longitude.toFixed(
+                        6
+                      )}° E (±${Math.round(report.location.accuracy || 0)}m)
+                      </a>`
+                    : '<span style="font-size: 11px; font-weight: 700; color: #334155; font-family: monospace;">52.406374° N, 16.925168° E</span>'
+                }
               </div>
               <div>
                 ${renderPhotoDocBadge()}

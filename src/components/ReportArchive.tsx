@@ -345,9 +345,24 @@ export function ReportArchive({
                 </div>
                 <div>
                   <div className="text-xs text-slate-400">Koordynaty GPS:</div>
-                  <div className="font-mono text-xs text-slate-800 dark:text-slate-200">
-                    {previewReport.location?.latitude?.toFixed(5)}° N, {previewReport.location?.longitude?.toFixed(5)}° E
-                  </div>
+                  {previewReport.location?.latitude && previewReport.location?.longitude ? (
+                    <a
+                      href={`https://www.google.com/maps?q=${previewReport.location.latitude},${previewReport.location.longitude}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Kliknij, aby otworzyć lokalizację w Google Maps"
+                      className="inline-flex items-center gap-1.5 font-mono text-xs text-sky-600 dark:text-sky-400 font-bold hover:underline cursor-pointer mt-0.5 group"
+                    >
+                      <span>
+                        {previewReport.location.latitude.toFixed(5)}° N, {previewReport.location.longitude.toFixed(5)}° E
+                      </span>
+                      <ExternalLink className="w-3.5 h-3.5 opacity-70 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                    </a>
+                  ) : (
+                    <div className="font-mono text-xs text-slate-500">
+                      Brak danych GPS
+                    </div>
+                  )}
                 </div>
               </div>
 

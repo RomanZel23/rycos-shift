@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import { MapPin, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
+import { MapPin, RefreshCw, CheckCircle2, AlertCircle, ExternalLink } from "lucide-react";
 import { GeoLocationData } from "@/types";
 
 interface GeoLocationBadgeProps {
@@ -89,13 +89,25 @@ export function GeoLocationBadge({ onLocationChange, location }: GeoLocationBadg
               </span>
             )}
           </div>
-          <div className="text-slate-600 dark:text-slate-300 text-xs sm:text-sm font-mono font-semibold mt-1">
-            {hasCoords
-              ? `${location.latitude?.toFixed(5)}° N, ${location.longitude?.toFixed(5)}° E ${
-                  location.accuracy ? `(±${Math.round(location.accuracy)}m)` : ""
-                }`
-              : errorMsg || "Pobieranie pozycji..."}
-          </div>
+          {hasCoords ? (
+            <a
+              href={`https://www.google.com/maps?q=${location.latitude},${location.longitude}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Kliknij, aby otworzyć lokalizację w Google Maps"
+              className="inline-flex items-center gap-1.5 text-slate-700 dark:text-slate-200 text-xs sm:text-sm font-mono font-bold mt-1 hover:text-sky-600 dark:hover:text-sky-400 hover:underline cursor-pointer transition-colors group"
+            >
+              <span>
+                {location.latitude?.toFixed(5)}° N, {location.longitude?.toFixed(5)}° E{" "}
+                {location.accuracy ? `(±${Math.round(location.accuracy)}m)` : ""}
+              </span>
+              <ExternalLink className="w-3.5 h-3.5 text-sky-500 opacity-70 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+            </a>
+          ) : (
+            <div className="text-slate-600 dark:text-slate-300 text-xs sm:text-sm font-mono font-semibold mt-1">
+              {errorMsg || "Pobieranie pozycji..."}
+            </div>
+          )}
         </div>
       </div>
 
