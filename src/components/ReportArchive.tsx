@@ -65,61 +65,35 @@ export function ReportArchive({
     message: string;
   } | null>(null);
 
-  // Synchronizacja modali ze stosem historii przeglądarki (Android Back gesture/button & Escape)
+  // Zamykanie modali klawiszem Escape
   useEffect(() => {
-    const handlePopState = (e: PopStateEvent) => {
-      const modal = e.state?.modal;
-      if (modal === "report_preview") {
-        // Cofnięto z powiększenia zdjęcia do podglądu raportu
-        setZoomPhoto(null);
-      } else if (!modal) {
-        // Cofnięto do samej listy archiwum
-        setZoomPhoto(null);
-        setPreviewReport(null);
-      }
-    };
-
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        if (zoomPhoto) closeZoomPhoto();
-        else if (previewReport) closePreviewReport();
+        if (zoomPhoto) setZoomPhoto(null);
+        else if (previewReport) setPreviewReport(null);
       }
     };
 
-    window.addEventListener("popstate", handlePopState);
     window.addEventListener("keydown", handleKeyDown);
     return () => {
-      window.removeEventListener("popstate", handlePopState);
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [zoomPhoto, previewReport]);
 
   const openPreviewReport = (report: DailyReport) => {
-    if (typeof window !== "undefined") {
-      window.history.pushState({ tab: "ARCHIVE", modal: "report_preview" }, "");
-    }
     setPreviewReport(report);
   };
 
   const closePreviewReport = () => {
     setPreviewReport(null);
-    if (typeof window !== "undefined" && window.history.state?.modal === "report_preview") {
-      window.history.back();
-    }
   };
 
   const openZoomPhoto = (data: ZoomPhotoData) => {
-    if (typeof window !== "undefined") {
-      window.history.pushState({ tab: "ARCHIVE", modal: "photo_zoom" }, "");
-    }
     setZoomPhoto(data);
   };
 
   const closeZoomPhoto = () => {
     setZoomPhoto(null);
-    if (typeof window !== "undefined" && window.history.state?.modal === "photo_zoom") {
-      window.history.back();
-    }
   };
 
   const filteredReports = reports.filter((r) => {

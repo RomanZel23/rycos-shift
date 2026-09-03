@@ -113,12 +113,9 @@ export default function Home() {
     }
   }, []);
 
-  // Obsługa nawigacji 'Wstecz' na Androidzie (PWA / Browser History)
-  const handleTabChange = useCallback((newTab: ActiveTab, pushHistory = true) => {
+  // Przełączanie aktywnej zakładki
+  const handleTabChange = useCallback((newTab: ActiveTab) => {
     setActiveTab(newTab);
-    if (pushHistory && typeof window !== "undefined") {
-      window.history.pushState({ tab: newTab }, "");
-    }
     // Gdy użytkownik wchodzi do Archiwum, natychmiast odśwież z bazy Supabase
     if (newTab === "ARCHIVE") {
       syncWithDatabase();
@@ -149,36 +146,19 @@ export default function Home() {
 
     // 1. Natychmiastowa synchronizacja z bazą Supabase przy starcie aplikacji
     syncWithDatabase();
-
-    // 2. Inicjalizacja bazowego stanu historii dla PWA
-    if (typeof window !== "undefined") {
-      window.history.replaceState({ tab: "START_SHIFT" }, "");
-
-      const handlePopState = (e: PopStateEvent) => {
-        if (e.state && e.state.tab) {
-          setActiveTab(e.state.tab);
-          if (e.state.tab === "ARCHIVE") {
-            syncWithDatabase();
-          }
-        }
-      };
-
-      window.addEventListener("popstate", handlePopState);
-      return () => window.removeEventListener("popstate", handlePopState);
-    }
   }, [syncWithDatabase]);
 
   // Handlery logowania i wylogowania
   const handleLogin = (user: User) => {
     setCurrentUser(user);
     setStoredLoggedUser(user);
-    handleTabChange("START_SHIFT", false);
+    handleTabChange("START_SHIFT");
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
     setStoredLoggedUser(null);
-    handleTabChange("START_SHIFT", false);
+    handleTabChange("START_SHIFT");
   };
 
   const handleUserChange = (user: User) => {
