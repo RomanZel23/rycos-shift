@@ -13,6 +13,41 @@ export interface PDFGenerationResult {
 }
 
 /**
+ * Zamienia polskie znaki diakrytyczne na ich bezpieczne odpowiedniki ASCII (np. ą -> a)
+ */
+export function removePolishDiacritics(text: string): string {
+  const map: Record<string, string> = {
+    ą: "a", Ą: "A",
+    ć: "c", Ć: "C",
+    ę: "e", Ę: "E",
+    ł: "l", Ł: "L",
+    ń: "n", Ń: "N",
+    ó: "o", Ó: "O",
+    ś: "s", Ś: "S",
+    ź: "z", Ź: "Z",
+    ż: "z", Ż: "Z",
+  };
+  return (text || "").replace(/[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/g, (char) => map[char] || char);
+}
+
+/**
+ * Zapewnia 100% bezpieczną nazwę pliku dla nagłówków e-mail (RFC 2231/MIME) oraz systemów plików
+ */
+export function sanitizePdfFileName(name: string): string {
+  let clean = removePolishDiacritics(name || "Raport");
+  clean = clean
+    .replace(/\s+/g, "_")
+    .replace(/[^a-zA-Z0-9._-]/g, "")
+    .replace(/_+/g, "_")
+    .replace(/-+/g, "-");
+
+  if (!clean.toLowerCase().endsWith(".pdf")) {
+    clean += ".pdf";
+  }
+  return clean;
+}
+
+/**
  * Główny generator PDF wykorzystujący silnik szablonów HTML.
  * Gwarantuje 100% poprawności polskich znaków diakrytycznych (ą, ć, ę, ł, ń, ó, ś, ź, ż),
  * idealną typografię korporacyjną SB Technology, wektorowe podpisy i fotorelację.
@@ -21,11 +56,11 @@ export async function generateReportPDFAsync(
   report: DailyReport,
   settings?: TenantSettings
 ): Promise<PDFGenerationResult> {
-  const safeSiteName = (report.siteName || "PlacBudowy").replace(/[^a-zA-Z0-9ąćęłńóśźżĄĆĘŁŃÓŚŹŻ_-]/g, "_");
+  const safeSiteName = sanitizePdfFileName(report.siteName || "PlacBudowy").replace(/\.pdf$/i, "");
   const reportTypeName =
     report.reportType === "START_SHIFT"
-      ? "Rozpoczęcie prac zespołu"
-      : "Zakończenie prac zespołu";
+      ? "Rozpoczecie_prac_zespolu"
+      : "Zakonczenie_prac_zespolu";
   const fileName = `${report.date}_${reportTypeName}_${safeSiteName}.pdf`;
 
   // Sprawdź czy jesteśmy w środowisku przeglądarki (klient)
@@ -135,11 +170,11 @@ export function generateReportPDF(report: DailyReport): PDFGenerationResult {
   const margin = 15;
   let currentY = margin;
 
-  const safeSiteName = (report.siteName || "PlacBudowy").replace(/[^a-zA-Z0-9_-]/g, "_");
+  const safeSiteName = sanitizePdfFileName(report.siteName || "PlacBudowy").replace(/\.pdf$/i, "");
   const reportTypeName =
     report.reportType === "START_SHIFT"
-      ? "Rozpoczecie prac zespolu"
-      : "Zakonczenie prac zespolu";
+      ? "Rozpoczecie_prac_zespolu"
+      : "Zakonczenie_prac_zespolu";
   const fileName = `${report.date}_${reportTypeName}_${safeSiteName}.pdf`;
 
   // Kolory

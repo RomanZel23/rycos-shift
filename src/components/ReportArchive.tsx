@@ -22,7 +22,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { DailyReport, TenantSettings } from "@/types";
-import { generateReportPDFAsync } from "@/lib/pdf-generator";
+import { generateReportPDFAsync, sanitizePdfFileName } from "@/lib/pdf-generator";
 import { formatPolishTime } from "@/lib/date-utils";
 
 interface ReportArchiveProps {
@@ -152,7 +152,7 @@ export function ReportArchive({
 
       // 1. Upewnij się, że mamy PDF DataURL (lub wygeneruj w razie potrzeby)
       let pdfBase64 = report.pdfDataUrl || "";
-      let fileName = report.pdfFileName || `Raport_${report.reportType}_${report.date}.pdf`;
+      let fileName = sanitizePdfFileName(report.pdfFileName || `Raport_${report.reportType}_${report.date}.pdf`);
 
       if (!pdfBase64) {
         const result = await generateReportPDFAsync(report);

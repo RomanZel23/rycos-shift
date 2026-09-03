@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { getSupabaseClient, isSupabaseConfigured } from "@/lib/supabase";
+import { sanitizePdfFileName } from "@/lib/pdf-generator";
 
 export async function POST(req: NextRequest) {
   try {
@@ -84,6 +85,9 @@ export async function POST(req: NextRequest) {
 
     const emailSubject = `[RYCOS Shift] ${reportTypeName} - ${siteName} (${date})`;
 
+    // Bezpieczna nazwa pliku bez znaków diakrytycznych dla nagłówków MIME e-mail
+    const safeAttachmentFileName = sanitizePdfFileName(fileName || `Raport_${reportType}_${date}.pdf`);
+
     if (!effectiveRecipients || effectiveRecipients.length === 0) {
       return NextResponse.json(
         { success: false, message: "Brak zdefiniowanych odbiorców e-mail" },
@@ -128,7 +132,7 @@ Plac Budowy: ${siteName}
 Brygadzista: ${foremanName}
 Data i godzina: ${date} | ${time}
 
-W załączniku niniejszej wiadomości znajduje się oficjalny dokument raportu dziennego w formacie PDF: ${fileName}
+W załączniku niniejszej wiadomości znajduje się oficjalny dokument raportu dziennego w formacie PDF: ${safeAttachmentFileName}
 Zawiera:
 - Listę obecności pracowników oraz ich odręczne podpisy cyfrowe
 - Tematykę instruktażu BHP i zakres robót
@@ -215,7 +219,7 @@ Prosimy nie odpowiadać bezpośrednio na ten adres e-mail.
           <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f1f5f9; border-left: 4px solid #0284c7; border-radius: 0 6px 6px 0; margin-bottom: 10px;">
             <tr>
               <td style="padding: 12px 16px; font-size: 12px; color: #334155;">
-                📎 Załączony plik PDF: <strong>${fileName}</strong><br/>
+                📎 Załączony plik PDF: <strong>${safeAttachmentFileName}</strong><br/>
                 🔒 Status: Wygenerowano automatycznie i podpisano w terenie.
               </td>
             </tr>
@@ -246,7 +250,7 @@ Prosimy nie odpowiadać bezpośrednio na ten adres e-mail.
       html: htmlContent,
       attachments: [
         {
-          filename: fileName,
+          filename: safeAttachmentFileName,
           content: pdfBuffer,
         },
       ],
