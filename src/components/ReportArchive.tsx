@@ -19,13 +19,15 @@ import {
   Maximize2,
   RefreshCw,
   Database,
+  AlertCircle,
 } from "lucide-react";
-import { DailyReport } from "@/types";
+import { DailyReport, TenantSettings } from "@/types";
 import { generateReportPDFAsync } from "@/lib/pdf-generator";
 import { formatPolishTime } from "@/lib/date-utils";
 
 interface ReportArchiveProps {
   reports: DailyReport[];
+  settings?: TenantSettings;
   onNewStartReport: () => void;
   onNewEndReport: () => void;
   onRefresh?: () => Promise<void>;
@@ -43,6 +45,7 @@ interface ZoomPhotoData {
 
 export function ReportArchive({
   reports,
+  settings,
   onNewStartReport,
   onNewEndReport,
   onRefresh,
@@ -53,6 +56,14 @@ export function ReportArchive({
   const [filterType, setFilterType] = useState<string>("ALL");
   const [previewReport, setPreviewReport] = useState<DailyReport | null>(null);
   const [zoomPhoto, setZoomPhoto] = useState<ZoomPhotoData | null>(null);
+
+  // Stan ponownej wysyłki raportu mailem
+  const [resendingId, setResendingId] = useState<string | null>(null);
+  const [resendStatus, setResendStatus] = useState<{
+    id: string;
+    success: boolean;
+    message: string;
+  } | null>(null);
 
   // Synchronizacja modali ze stosem historii przeglądarki (Android Back gesture/button & Escape)
   useEffect(() => {
@@ -134,6 +145,82 @@ export function ReportArchive({
     link.click();
   };
 
+  const handleResendEmail = async (report: DailyReport) => {
+    try {
+      setResendingId(report.id);
+      setResendStatus(null);
+
+      // 1. Upewnij się, że mamy PDF DataURL (lub wygeneruj w razie potrzeby)
+      let pdfBase64 = report.pdfDataUrl || "";
+      let fileName = report.pdfFileName || `Raport_${report.reportType}_${report.date}.pdf`;
+
+      if (!pdfBase64) {
+        const result = await generateReportPDFAsync(report);
+        pdfBase64 = result.dataUrl;
+        fileName = result.fileName;
+      }
+
+      // 2. Określ listę odbiorców (z raportu lub aktualnych ustawień)
+      const recipients =
+        report.sentToEmails && report.sentToEmails.length > 0
+          ? report.sentToEmails
+          : report.reportType === "START_SHIFT"
+          ? settings?.startShiftEmailRecipients || []
+          : settings?.endShiftEmailRecipients || [];
+
+      if (recipients.length === 0) {
+        setResendStatus({
+          id: report.id,
+          success: false,
+          message: "Brak zdefiniowanych adresów e-mail odbiorców dla tego raportu w Ustawieniach.",
+        });
+        return;
+      }
+
+      // 3. Wyślij przez /api/send-report
+      const response = await fetch("/api/send-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pdfBase64,
+          fileName,
+          reportType: report.reportType,
+          siteName: report.siteName,
+          date: report.date,
+          time: report.time,
+          recipients,
+          apiKey: settings?.resendApiKey,
+          fromEmail: settings?.resendFromEmail || "raporty@shift.rycos.eu",
+          foremanName: report.foremanName,
+        }),
+      });
+
+      const resJson = await response.json();
+      if (resJson.success) {
+        setResendStatus({
+          id: report.id,
+          success: true,
+          message: `E-mail został pomyślnie wysłany na adresy: ${recipients.join(", ")}`,
+        });
+      } else {
+        setResendStatus({
+          id: report.id,
+          success: false,
+          message: resJson.message || "Błąd wysyłki wiadomości e-mail.",
+        });
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Wystąpił nieoczekiwany błąd podczas wysyłki";
+      setResendStatus({
+        id: report.id,
+        success: false,
+        message: msg,
+      });
+    } finally {
+      setResendingId(null);
+    }
+  };
+
   return (
     <div className="w-full max-w-5xl mx-auto space-y-6 pb-32 md:pb-20">
       {/* NAGŁÓWEK ARCHIWUM */}
@@ -200,6 +287,33 @@ export function ReportArchive({
           </button>
         </div>
       </div>
+
+      {/* BANER STATUSU PONOWNEJ WYSYŁKI MAILA */}
+      {resendStatus && (
+        <div
+          className={`p-4 rounded-2xl border-2 flex items-center justify-between gap-3 animate-fade-in ${
+            resendStatus.success
+              ? "bg-emerald-50 border-emerald-300 text-emerald-900 dark:bg-emerald-950/60 dark:border-emerald-700 dark:text-emerald-200"
+              : "bg-rose-50 border-rose-300 text-rose-900 dark:bg-rose-950/60 dark:border-rose-700 dark:text-rose-200"
+          }`}
+        >
+          <div className="flex items-center gap-2.5 text-sm font-bold">
+            {resendStatus.success ? (
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+            ) : (
+              <AlertCircle className="w-5 h-5 text-rose-600 dark:text-rose-400 flex-shrink-0" />
+            )}
+            <span>{resendStatus.message}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setResendStatus(null)}
+            className="p-1 hover:bg-black/10 rounded-lg transition-colors cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* FILTROWANIE I WYSZUKIWANIE */}
       <div className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-3xl border-2 border-slate-200 dark:border-slate-800 shadow-sm flex flex-col sm:flex-row gap-4">
@@ -308,21 +422,31 @@ export function ReportArchive({
                   </div>
 
                   {/* PRZYCISKI AKCJI DLA RAPORTU */}
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleResendEmail(report)}
+                      disabled={resendingId === report.id}
+                      title="Wyślij ten raport e-mailem ponownie"
+                      className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/70 dark:hover:bg-emerald-900/80 text-emerald-700 dark:text-emerald-300 rounded-xl text-xs sm:text-sm font-bold border border-emerald-300 dark:border-emerald-800 transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      <Send className={`w-3.5 h-3.5 ${resendingId === report.id ? "animate-spin" : ""}`} />
+                      <span>{resendingId === report.id ? "Wysyłanie..." : "Wyślij e-mail"}</span>
+                    </button>
                     <button
                       type="button"
                       onClick={() => openPreviewReport(report)}
-                      className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-xs sm:text-sm font-bold transition-colors cursor-pointer"
+                      className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-xs sm:text-sm font-bold transition-colors cursor-pointer"
                     >
-                      <Eye className="w-4 h-4 text-sky-500" />
+                      <Eye className="w-3.5 h-3.5 text-sky-500" />
                       <span>Szczegóły</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => handleDownload(report)}
-                      className="flex items-center gap-2 px-4 py-2.5 bg-sky-50 hover:bg-sky-100 dark:bg-sky-950 dark:hover:bg-sky-900 text-sky-600 dark:text-sky-300 rounded-xl text-xs sm:text-sm font-bold transition-colors cursor-pointer"
+                      className="flex items-center gap-1.5 px-3.5 py-2 bg-sky-50 hover:bg-sky-100 dark:bg-sky-950 dark:hover:bg-sky-900 text-sky-600 dark:text-sky-300 rounded-xl text-xs sm:text-sm font-bold transition-colors cursor-pointer"
                     >
-                      <Download className="w-4 h-4" />
+                      <Download className="w-3.5 h-3.5" />
                       <span>Pobierz PDF</span>
                     </button>
                   </div>
@@ -554,25 +678,38 @@ export function ReportArchive({
               )}
             </div>
 
-            <div className="px-6 py-4 bg-slate-50 dark:bg-slate-900/80 border-t-2 border-slate-200 dark:border-slate-800 flex items-center justify-end gap-3">
+            <div className="px-6 py-4 bg-slate-50 dark:bg-slate-900/80 border-t-2 border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
               <button
                 type="button"
-                onClick={closePreviewReport}
-                className="px-5 py-3 rounded-2xl border-2 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 font-bold text-sm transition-colors cursor-pointer"
+                onClick={() => handleResendEmail(previewReport)}
+                disabled={resendingId === previewReport.id}
+                title="Wyślij ten raport e-mailem ponownie"
+                className="flex items-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm rounded-2xl shadow-lg shadow-emerald-600/30 transition-all cursor-pointer active:scale-95 disabled:opacity-60"
               >
-                Zamknij
+                <Send className={`w-4 h-4 ${resendingId === previewReport.id ? "animate-spin" : ""}`} />
+                <span>{resendingId === previewReport.id ? "Wysyłanie e-maila..." : "Wyślij e-mail ponownie"}</span>
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  handleDownload(previewReport);
-                  closePreviewReport();
-                }}
-                className="flex items-center gap-2 px-6 py-3 bg-sky-600 hover:bg-sky-500 text-white font-black text-sm rounded-2xl shadow-lg shadow-sky-600/30 transition-all cursor-pointer active:scale-95"
-              >
-                <Download className="w-4 h-4" />
-                Pobierz dokument PDF
-              </button>
+
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={closePreviewReport}
+                  className="px-5 py-3 rounded-2xl border-2 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 font-bold text-sm transition-colors cursor-pointer"
+                >
+                  Zamknij
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleDownload(previewReport);
+                    closePreviewReport();
+                  }}
+                  className="flex items-center gap-2 px-5 py-3 bg-sky-600 hover:bg-sky-500 text-white font-black text-sm rounded-2xl shadow-lg shadow-sky-600/30 transition-all cursor-pointer active:scale-95"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Pobierz PDF</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

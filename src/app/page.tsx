@@ -308,6 +308,7 @@ export default function Home() {
         {activeTab === "ARCHIVE" && (
           <ReportArchive
             reports={reports}
+            settings={settings}
             onNewStartReport={() => handleTabChange("START_SHIFT")}
             onNewEndReport={() => handleTabChange("END_SHIFT")}
             onRefresh={syncWithDatabase}

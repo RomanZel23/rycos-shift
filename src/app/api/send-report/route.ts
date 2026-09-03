@@ -77,11 +77,21 @@ export async function POST(req: NextRequest) {
 
     const resend = new Resend(resendApiKey);
 
-    // Przygotuj załącznik z Base64
-    const cleanBase64 = pdfBase64.includes("base64,")
-      ? pdfBase64.split("base64,")[1]
-      : pdfBase64;
-    const pdfBuffer = Buffer.from(cleanBase64, "base64");
+    // Przygotuj załącznik z Base64 lub pobierz z Storage Bucket URL
+    let pdfBuffer: Buffer;
+    if (typeof pdfBase64 === "string" && (pdfBase64.startsWith("http://") || pdfBase64.startsWith("https://"))) {
+      const pdfFetch = await fetch(pdfBase64);
+      if (!pdfFetch.ok) {
+        throw new Error(`Nie udało się pobrać pliku PDF z chmury Storage: ${pdfFetch.statusText}`);
+      }
+      const arrayBuf = await pdfFetch.arrayBuffer();
+      pdfBuffer = Buffer.from(arrayBuf);
+    } else {
+      const cleanBase64 = typeof pdfBase64 === "string" && pdfBase64.includes("base64,")
+        ? pdfBase64.split("base64,")[1]
+        : pdfBase64 || "";
+      pdfBuffer = Buffer.from(cleanBase64, "base64");
+    }
 
     // 1. Wersja tekstowa (Plain Text Fallback) - kluczowa dla Outlooka i filtrów antyspamowych
     const textContent = `
