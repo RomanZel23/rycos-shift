@@ -18,19 +18,29 @@ export async function POST(req: NextRequest) {
       foremanName,
     } = body;
 
-    // Pobierz oficjalny adres nadawcy z bazy Supabase (nadrzędne źródło prawdy)
+    // Pobierz oficjalny adres nadawcy oraz aktualną listę odbiorców z bazy Supabase (nadrzędne źródło prawdy)
     let configuredFromEmail = "";
+    let configuredRecipients: string[] = [];
     if (isSupabaseConfigured()) {
       try {
         const supabase = getSupabaseClient();
         if (supabase) {
           const { data: dbSettings } = await supabase
             .from("tenant_settings")
-            .select("resend_from_email")
+            .select("resend_from_email, start_shift_email_recipients, end_shift_email_recipients")
             .limit(1)
             .maybeSingle();
-          if (dbSettings?.resend_from_email) {
-            configuredFromEmail = dbSettings.resend_from_email.trim();
+          if (dbSettings) {
+            if (dbSettings.resend_from_email) {
+              configuredFromEmail = dbSettings.resend_from_email.trim();
+            }
+            const dbList =
+              reportType === "START_SHIFT"
+                ? dbSettings.start_shift_email_recipients
+                : dbSettings.end_shift_email_recipients;
+            if (Array.isArray(dbList) && dbList.length > 0) {
+              configuredRecipients = dbList;
+            }
           }
         }
       } catch (dbErr) {
@@ -52,6 +62,21 @@ export async function POST(req: NextRequest) {
       effectiveFromEmail = "raporty@shift.rycos.eu";
     }
 
+    // Ustalenie odbiorców e-mail:
+    // Jeśli przesłano stare/testowe adresy (raporty-start@solutionsbay.pl) lub puste,
+    // automatycznie użyj aktualnych odbiorców zapisanych w bazie Supabase
+    let effectiveRecipients = Array.isArray(recipients) ? recipients : [];
+    const hasLegacyRecipients = effectiveRecipients.some(
+      (r) =>
+        r.includes("raporty-start@solutionsbay.pl") ||
+        r.includes("raporty-koniec@solutionsbay.pl") ||
+        r.includes("kierownik.budowy@solutionsbay.pl")
+    );
+
+    if ((effectiveRecipients.length === 0 || hasLegacyRecipients) && configuredRecipients.length > 0) {
+      effectiveRecipients = configuredRecipients;
+    }
+
     const reportTypeName =
       reportType === "START_SHIFT"
         ? "Rozpoczęcie prac zespołu"
@@ -59,7 +84,7 @@ export async function POST(req: NextRequest) {
 
     const emailSubject = `[RYCOS Shift] ${reportTypeName} - ${siteName} (${date})`;
 
-    if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
+    if (!effectiveRecipients || effectiveRecipients.length === 0) {
       return NextResponse.json(
         { success: false, message: "Brak zdefiniowanych odbiorców e-mail" },
         { status: 400 }
@@ -71,7 +96,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         success: true,
         simulated: true,
-        message: `Raport wygenerowany pomyślnie. W trybie demo/testowym zasymulowano wysyłkę do: ${recipients.join(", ")}. Aby wysyłać realne wiadomości, dodaj klucz Resend API w zakładce Ustawienia lub pliku .env.local.`,
+        message: `Raport wygenerowany pomyślnie. W trybie demo/testowym zasymulowano wysyłkę do: ${effectiveRecipients.join(", ")}. Aby wysyłać realne wiadomości, dodaj klucz Resend API w zakładce Ustawienia lub pliku .env.local.`,
       });
     }
 
@@ -215,7 +240,7 @@ Prosimy nie odpowiadać bezpośrednio na ten adres e-mail.
     // Wysyłka z równoczesną częścią HTML oraz Text (pełna specyfikacja MIME multipart/alternative)
     const { data, error } = await resend.emails.send({
       from: `RYCOS Shift <${effectiveFromEmail}>`,
-      to: recipients,
+      to: effectiveRecipients,
       subject: emailSubject,
       text: textContent,
       html: htmlContent,
@@ -241,7 +266,7 @@ Prosimy nie odpowiadać bezpośrednio na ten adres e-mail.
     return NextResponse.json({
       success: true,
       data,
-      message: `Raport został pomyślnie wysłany na adresy: ${recipients.join(", ")}`,
+      message: `Raport został pomyślnie wysłany na adresy: ${effectiveRecipients.join(", ")}`,
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Wystąpił nieoczekiwany błąd podczas wysyłki";

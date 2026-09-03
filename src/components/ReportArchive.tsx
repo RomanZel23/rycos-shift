@@ -160,13 +160,20 @@ export function ReportArchive({
         fileName = result.fileName;
       }
 
-      // 2. Określ listę odbiorców (z raportu lub aktualnych ustawień)
+      // 2. Zawsze używaj aktualnych odbiorców zdefiniowanych w Ustawieniach
+      const configuredRecipients =
+        report.reportType === "START_SHIFT"
+          ? settings?.startShiftEmailRecipients
+          : settings?.endShiftEmailRecipients;
+
       const recipients =
-        report.sentToEmails && report.sentToEmails.length > 0
+        configuredRecipients && configuredRecipients.length > 0
+          ? configuredRecipients
+          : report.sentToEmails &&
+            report.sentToEmails.length > 0 &&
+            !report.sentToEmails.some((e) => e.includes("raporty-start") || e.includes("kierownik.budowy"))
           ? report.sentToEmails
-          : report.reportType === "START_SHIFT"
-          ? settings?.startShiftEmailRecipients || []
-          : settings?.endShiftEmailRecipients || [];
+          : [];
 
       if (recipients.length === 0) {
         setResendStatus({

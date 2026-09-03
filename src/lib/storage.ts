@@ -13,13 +13,18 @@ export const INITIAL_SETTINGS: TenantSettings = {
   logoText: "SB Technology",
   logoSubtitle: "RYCOS Shift workflow",
   startShiftEmailRecipients: [
-    "raporty-start@solutionsbay.pl",
-    "kierownik.budowy@solutionsbay.pl"
+    "marcin.bajda@solutionsbay.pl",
+    "jaroslaw.sarna@solutionsbay.pl",
+    "tomasz.kowal@kza.com.pl",
+    "karolina.kaminska@kza.com.pl",
+    "roman.zeleznik@solutionsbay.pl",
   ],
   endShiftEmailRecipients: [
-    "raporty-koniec@solutionsbay.pl",
-    "kierownik.budowy@solutionsbay.pl",
-    "zarzad@solutionsbay.pl"
+    "marcin.bajda@solutionsbay.pl",
+    "jaroslaw.sarna@solutionsbay.pl",
+    "tomasz.kowal@kza.com.pl",
+    "karolina.kaminska@kza.com.pl",
+    "roman.zeleznik@solutionsbay.pl",
   ],
   resendApiKey: "",
   resendFromEmail: "raporty@shift.rycos.eu",
@@ -92,8 +97,26 @@ export const getStoredSettings = (): TenantSettings => {
     const data = localStorage.getItem(STORAGE_KEYS.SETTINGS);
     if (!data) return INITIAL_SETTINGS;
     const parsed: TenantSettings = JSON.parse(data);
+    let changed = false;
     if (parsed.resendFromEmail && parsed.resendFromEmail.includes("solutionsbay.pl")) {
       parsed.resendFromEmail = "raporty@shift.rycos.eu";
+      changed = true;
+    }
+    if (
+      parsed.startShiftEmailRecipients &&
+      parsed.startShiftEmailRecipients.some((e) => e.includes("raporty-start@solutionsbay.pl"))
+    ) {
+      parsed.startShiftEmailRecipients = INITIAL_SETTINGS.startShiftEmailRecipients;
+      changed = true;
+    }
+    if (
+      parsed.endShiftEmailRecipients &&
+      parsed.endShiftEmailRecipients.some((e) => e.includes("raporty-koniec@solutionsbay.pl"))
+    ) {
+      parsed.endShiftEmailRecipients = INITIAL_SETTINGS.endShiftEmailRecipients;
+      changed = true;
+    }
+    if (changed) {
       localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(parsed));
     }
     return parsed;
