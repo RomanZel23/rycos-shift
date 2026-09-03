@@ -92,31 +92,29 @@ export function ReportArchive({
 
   const openPreviewReport = (report: DailyReport) => {
     if (typeof window !== "undefined") {
-      window.history.pushState({ modal: "report_preview" }, "");
+      window.history.pushState({ tab: "ARCHIVE", modal: "report_preview" }, "");
     }
     setPreviewReport(report);
   };
 
   const closePreviewReport = () => {
+    setPreviewReport(null);
     if (typeof window !== "undefined" && window.history.state?.modal === "report_preview") {
       window.history.back();
-    } else {
-      setPreviewReport(null);
     }
   };
 
   const openZoomPhoto = (data: ZoomPhotoData) => {
     if (typeof window !== "undefined") {
-      window.history.pushState({ modal: "photo_zoom" }, "");
+      window.history.pushState({ tab: "ARCHIVE", modal: "photo_zoom" }, "");
     }
     setZoomPhoto(data);
   };
 
   const closeZoomPhoto = () => {
+    setZoomPhoto(null);
     if (typeof window !== "undefined" && window.history.state?.modal === "photo_zoom") {
       window.history.back();
-    } else {
-      setZoomPhoto(null);
     }
   };
 

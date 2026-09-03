@@ -160,8 +160,6 @@ export default function Home() {
           if (e.state.tab === "ARCHIVE") {
             syncWithDatabase();
           }
-        } else if (!e.state || !e.state.modal) {
-          setActiveTab("START_SHIFT");
         }
       };
 
