@@ -22,7 +22,7 @@ export const INITIAL_SETTINGS: TenantSettings = {
     "zarzad@solutionsbay.pl"
   ],
   resendApiKey: "",
-  resendFromEmail: "raporty@solutionsbay.pl",
+  resendFromEmail: "raporty@shift.rycos.eu",
   storageFolder: "Raporty_RYCOS_Shift_Poznan",
 };
 
@@ -91,7 +91,12 @@ export const getStoredSettings = (): TenantSettings => {
   try {
     const data = localStorage.getItem(STORAGE_KEYS.SETTINGS);
     if (!data) return INITIAL_SETTINGS;
-    return JSON.parse(data);
+    const parsed: TenantSettings = JSON.parse(data);
+    if (parsed.resendFromEmail && parsed.resendFromEmail.includes("solutionsbay.pl")) {
+      parsed.resendFromEmail = "raporty@shift.rycos.eu";
+      localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(parsed));
+    }
+    return parsed;
   } catch {
     return INITIAL_SETTINGS;
   }

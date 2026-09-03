@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
+import { getSupabaseClient, isSupabaseConfigured } from "@/lib/supabase";
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,8 +18,39 @@ export async function POST(req: NextRequest) {
       foremanName,
     } = body;
 
+    // Pobierz oficjalny adres nadawcy z bazy Supabase (nadrzędne źródło prawdy)
+    let configuredFromEmail = "";
+    if (isSupabaseConfigured()) {
+      try {
+        const supabase = getSupabaseClient();
+        if (supabase) {
+          const { data: dbSettings } = await supabase
+            .from("tenant_settings")
+            .select("resend_from_email")
+            .limit(1)
+            .maybeSingle();
+          if (dbSettings?.resend_from_email) {
+            configuredFromEmail = dbSettings.resend_from_email.trim();
+          }
+        }
+      } catch (dbErr) {
+        console.warn("Could not query tenant_settings in send-report:", dbErr);
+      }
+    }
+
     const resendApiKey = apiKey || process.env.RESEND_API_KEY;
-    const effectiveFromEmail = fromEmail || process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
+    
+    // Ustal adres nadawcy ze zweryfikowaną w Resend domeną shift.rycos.eu
+    let effectiveFromEmail =
+      configuredFromEmail ||
+      process.env.RESEND_FROM_EMAIL ||
+      fromEmail ||
+      "raporty@shift.rycos.eu";
+
+    // Zabezpieczenie: jeśli telefon przesłał starą, niezweryfikowaną domenę solutionsbay.pl
+    if (effectiveFromEmail.includes("solutionsbay.pl") || !effectiveFromEmail.includes("@")) {
+      effectiveFromEmail = "raporty@shift.rycos.eu";
+    }
 
     const reportTypeName =
       reportType === "START_SHIFT"
