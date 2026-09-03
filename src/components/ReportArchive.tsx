@@ -67,10 +67,14 @@ export function ReportArchive({
 
   // Synchronizacja modali ze stosem historii przeglądarki (Android Back gesture/button & Escape)
   useEffect(() => {
-    const handlePopState = () => {
-      if (zoomPhoto) {
+    const handlePopState = (e: PopStateEvent) => {
+      const modal = e.state?.modal;
+      if (modal === "report_preview") {
+        // Cofnięto z powiększenia zdjęcia do podglądu raportu
         setZoomPhoto(null);
-      } else if (previewReport) {
+      } else if (!modal) {
+        // Cofnięto do samej listy archiwum
+        setZoomPhoto(null);
         setPreviewReport(null);
       }
     };
