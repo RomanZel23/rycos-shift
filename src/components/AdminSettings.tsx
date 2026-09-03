@@ -135,14 +135,21 @@ export function AdminSettings({
     triggerSaveBanner("Użytkownik został pomyślnie dodany i zapisany w Supabase.");
   };
 
-  const handleDeleteUser = (userId: string) => {
+  const handleDeleteUser = async (userId: string) => {
     if (users.length <= 1) {
       alert("Nie można usunąć ostatniego użytkownika w systemie.");
       return;
     }
     const updated = users.filter((u) => u.id !== userId);
     onUpdateUsers(updated);
-    triggerSaveBanner("Użytkownik został usunięty.");
+    try {
+      await fetch("/api/db/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "DELETE_USER", userId }),
+      });
+    } catch {}
+    triggerSaveBanner("Użytkownik został usunięty z bazy Supabase.");
   };
 
   // --- OBSŁUGA PLACÓW BUDOWY ---
@@ -163,13 +170,21 @@ export function AdminSettings({
     triggerSaveBanner("Plac budowy został dodany i zapisany w Supabase.");
   };
 
-  const handleDeleteSite = (siteId: string) => {
+  const handleDeleteSite = async (siteId: string) => {
     if (sites.length <= 1) {
       alert("W systemie musi pozostać co najmniej jeden plac budowy.");
       return;
     }
-    onUpdateSites(sites.filter((s) => s.id !== siteId));
-    triggerSaveBanner("Plac budowy został usunięty.");
+    const updated = sites.filter((s) => s.id !== siteId);
+    onUpdateSites(updated);
+    try {
+      await fetch("/api/db/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "DELETE_SITE", siteId }),
+      });
+    } catch {}
+    triggerSaveBanner("Plac budowy został usunięty z bazy Supabase.");
   };
 
   // --- OBSŁUGA SZABLONÓW TEMATÓW ---
@@ -188,9 +203,17 @@ export function AdminSettings({
     triggerSaveBanner("Szablon tematu odprawy został dodany i zapisany w Supabase.");
   };
 
-  const handleDeleteTopic = (topicId: string) => {
-    onUpdateTopics(topicTemplates.filter((t) => t.id !== topicId));
-    triggerSaveBanner("Szablon tematu został usunięty.");
+  const handleDeleteTopic = async (topicId: string) => {
+    const updated = topicTemplates.filter((t) => t.id !== topicId);
+    onUpdateTopics(updated);
+    try {
+      await fetch("/api/db/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "DELETE_TOPIC", topicId }),
+      });
+    } catch {}
+    triggerSaveBanner("Szablon tematu został usunięty z bazy Supabase.");
   };
 
   // --- ZAPIS USTAWIEŃ MAILINGOWYCH & INSTANCJI ---

@@ -17,11 +17,7 @@ import {
   PdfTemplate,
 } from "@/types";
 import {
-  INITIAL_USERS,
-  INITIAL_SITES,
-  INITIAL_TOPIC_TEMPLATES,
   INITIAL_SETTINGS,
-  INITIAL_PDF_TEMPLATES,
   getStoredUsers,
   saveStoredUsers,
   getStoredSites,
@@ -40,13 +36,13 @@ import {
 export default function Home() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("START_SHIFT");
 
-  // Główne stany aplikacji zainicjalizowane od razu danymi startowymi
-  const [users, setUsers] = useState<User[]>(INITIAL_USERS);
-  const [sites, setSites] = useState<ConstructionSite[]>(INITIAL_SITES);
-  const [topics, setTopics] = useState<DiscussedTopicTemplate[]>(INITIAL_TOPIC_TEMPLATES);
+  // Wszystkie stany pobierane w 100% z bazy danych Supabase (brak wpisów na sztywno)
+  const [users, setUsers] = useState<User[]>([]);
+  const [sites, setSites] = useState<ConstructionSite[]>([]);
+  const [topics, setTopics] = useState<DiscussedTopicTemplate[]>([]);
   const [settings, setSettings] = useState<TenantSettings>(INITIAL_SETTINGS);
   const [reports, setReports] = useState<DailyReport[]>([]);
-  const [pdfTemplates, setPdfTemplates] = useState<PdfTemplate[]>(INITIAL_PDF_TEMPLATES);
+  const [pdfTemplates, setPdfTemplates] = useState<PdfTemplate[]>([]);
   
   // Stan autentykacji / zalogowanego użytkownika
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -55,7 +51,7 @@ export default function Home() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isSupabaseConnected, setIsSupabaseConnected] = useState(true);
 
-  // Funkcja pobierania najświeższych danych z bazy danych Supabase
+  // Funkcja pobierania najświeższych danych bezpośrednio z bazy danych Supabase
   const syncWithDatabase = useCallback(async () => {
     try {
       setIsSyncing(true);
@@ -72,7 +68,7 @@ export default function Home() {
           pdfTemplates: dbTemplates,
         } = resJson.data;
 
-        if (dbUsers && dbUsers.length > 0) {
+        if (Array.isArray(dbUsers)) {
           setUsers(dbUsers);
           saveStoredUsers(dbUsers);
           const loggedUser = getStoredLoggedUser();
@@ -84,11 +80,11 @@ export default function Home() {
             }
           }
         }
-        if (dbSites && dbSites.length > 0) {
+        if (Array.isArray(dbSites)) {
           setSites(dbSites);
           saveStoredSites(dbSites);
         }
-        if (dbTopics && dbTopics.length > 0) {
+        if (Array.isArray(dbTopics)) {
           setTopics(dbTopics);
           saveStoredTopics(dbTopics);
         }
@@ -96,13 +92,13 @@ export default function Home() {
           setSettings(dbSettings);
           saveStoredSettings(dbSettings);
         }
-        if (dbReports) {
+        if (Array.isArray(dbReports)) {
           setReports(dbReports);
           try {
             localStorage.setItem("rycos_shift_reports_v1", JSON.stringify(dbReports));
           } catch {}
         }
-        if (dbTemplates && dbTemplates.length > 0) {
+        if (Array.isArray(dbTemplates)) {
           setPdfTemplates(dbTemplates);
           saveStoredPdfTemplates(dbTemplates);
         }

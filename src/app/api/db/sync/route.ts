@@ -182,40 +182,86 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Zapis/Synchronizacja Użytkowników
-    if (action === "SYNC_USERS" && users) {
-      const mapped = users.map((u: User) => ({
-        id: u.id,
-        first_name: u.firstName,
-        last_name: u.lastName,
-        role: u.role,
-        is_foreman: u.isForeman,
-        is_admin: u.isAdmin,
-        login: u.login,
-      }));
-      await supabase.from("users").upsert(mapped, { onConflict: "id" });
+    if (action === "SYNC_USERS" && Array.isArray(users)) {
+      const activeIds = users.map((u: User) => u.id).filter(Boolean);
+      if (activeIds.length > 0) {
+        // Usuń z Supabase użytkowników, którzy zostali usunięci w aplikacji
+        await supabase
+          .from("users")
+          .delete()
+          .not("id", "in", `(${activeIds.map((id) => `"${id}"`).join(",")})`);
+
+        const mapped = users.map((u: User) => ({
+          id: u.id,
+          first_name: u.firstName,
+          last_name: u.lastName,
+          role: u.role,
+          is_foreman: u.isForeman,
+          is_admin: u.isAdmin,
+          login: u.login,
+        }));
+        await supabase.from("users").upsert(mapped, { onConflict: "id" });
+      } else {
+        await supabase.from("users").delete().neq("id", "");
+      }
+      return NextResponse.json({ success: true });
+    }
+
+    if (action === "DELETE_USER" && body.userId) {
+      await supabase.from("users").delete().eq("id", body.userId);
       return NextResponse.json({ success: true });
     }
 
     // 3. Zapis/Synchronizacja Placów Budowy
-    if (action === "SYNC_SITES" && sites) {
-      const mapped = sites.map((s: ConstructionSite) => ({
-        id: s.id,
-        name: s.name,
-        address: s.address,
-        active: s.active,
-      }));
-      await supabase.from("construction_sites").upsert(mapped, { onConflict: "id" });
+    if (action === "SYNC_SITES" && Array.isArray(sites)) {
+      const activeIds = sites.map((s: ConstructionSite) => s.id).filter(Boolean);
+      if (activeIds.length > 0) {
+        await supabase
+          .from("construction_sites")
+          .delete()
+          .not("id", "in", `(${activeIds.map((id) => `"${id}"`).join(",")})`);
+
+        const mapped = sites.map((s: ConstructionSite) => ({
+          id: s.id,
+          name: s.name,
+          address: s.address,
+          active: s.active,
+        }));
+        await supabase.from("construction_sites").upsert(mapped, { onConflict: "id" });
+      } else {
+        await supabase.from("construction_sites").delete().neq("id", "");
+      }
+      return NextResponse.json({ success: true });
+    }
+
+    if (action === "DELETE_SITE" && body.siteId) {
+      await supabase.from("construction_sites").delete().eq("id", body.siteId);
       return NextResponse.json({ success: true });
     }
 
     // 4. Zapis/Synchronizacja Szablonów Tematów
-    if (action === "SYNC_TOPICS" && topics) {
-      const mapped = topics.map((t: DiscussedTopicTemplate) => ({
-        id: t.id,
-        title: t.title,
-        category: t.category || "BHP",
-      }));
-      await supabase.from("topic_templates").upsert(mapped, { onConflict: "id" });
+    if (action === "SYNC_TOPICS" && Array.isArray(topics)) {
+      const activeIds = topics.map((t: DiscussedTopicTemplate) => t.id).filter(Boolean);
+      if (activeIds.length > 0) {
+        await supabase
+          .from("topic_templates")
+          .delete()
+          .not("id", "in", `(${activeIds.map((id) => `"${id}"`).join(",")})`);
+
+        const mapped = topics.map((t: DiscussedTopicTemplate) => ({
+          id: t.id,
+          title: t.title,
+          category: t.category || "BHP",
+        }));
+        await supabase.from("topic_templates").upsert(mapped, { onConflict: "id" });
+      } else {
+        await supabase.from("topic_templates").delete().neq("id", "");
+      }
+      return NextResponse.json({ success: true });
+    }
+
+    if (action === "DELETE_TOPIC" && body.topicId) {
+      await supabase.from("topic_templates").delete().eq("id", body.topicId);
       return NextResponse.json({ success: true });
     }
 

@@ -205,48 +205,66 @@ export function LoginForm({ users, onLogin, onRefresh, isSyncing }: LoginFormPro
                     </button>
                   )}
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-56 overflow-y-auto pr-1">
-                  {users.map((u) => {
-                    const isSelected = selectedUser?.id === u.id;
-                    return (
+                {users.length === 0 ? (
+                  <div className="p-8 text-center bg-slate-950/60 rounded-2xl border border-slate-800 space-y-3">
+                    <RefreshCw className="w-6 h-6 text-sky-400 animate-spin mx-auto" />
+                    <p className="text-xs font-bold text-slate-300">
+                      Pobieranie listy pracowników z bazy danych Supabase...
+                    </p>
+                    {onRefresh && (
                       <button
-                        key={u.id}
                         type="button"
-                        onClick={() => {
-                          setSelectedUser(u);
-                          setErrorMessage(null);
-                        }}
-                        className={`p-3 rounded-2xl border-2 text-left transition-all flex items-center gap-3 cursor-pointer ${
-                          isSelected
-                            ? "bg-sky-950/80 border-sky-500 shadow-md shadow-sky-500/20 text-white"
-                            : "bg-slate-800/60 border-slate-700/80 hover:bg-slate-800 text-slate-300"
-                        }`}
+                        onClick={onRefresh}
+                        className="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
                       >
-                        <div
-                          className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-xs ${
-                            u.isAdmin
-                              ? "bg-amber-500 text-slate-950"
-                              : u.isForeman
-                              ? "bg-sky-500 text-white"
-                              : "bg-slate-700 text-slate-200"
+                        Pobierz z bazy
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-56 overflow-y-auto pr-1">
+                    {users.map((u) => {
+                      const isSelected = selectedUser?.id === u.id;
+                      return (
+                        <button
+                          key={u.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedUser(u);
+                            setErrorMessage(null);
+                          }}
+                          className={`p-3 rounded-2xl border-2 text-left transition-all flex items-center gap-3 cursor-pointer ${
+                            isSelected
+                              ? "bg-sky-950/80 border-sky-500 shadow-md shadow-sky-500/20 text-white"
+                              : "bg-slate-800/60 border-slate-700/80 hover:bg-slate-800 text-slate-300"
                           }`}
                         >
-                          {u.firstName[0]}
-                          {u.lastName[0]}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="font-black text-sm truncate text-white">
-                            {u.firstName} {u.lastName}
+                          <div
+                            className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-xs ${
+                              u.isAdmin
+                                ? "bg-amber-500 text-slate-950"
+                                : u.isForeman
+                                ? "bg-sky-500 text-white"
+                                : "bg-slate-700 text-slate-200"
+                            }`}
+                          >
+                            {u.firstName[0]}
+                            {u.lastName[0]}
                           </div>
-                          <div className="text-[11px] text-slate-400 truncate font-medium">
-                            {u.role}
+                          <div className="min-w-0 flex-1">
+                            <div className="font-black text-sm truncate text-white">
+                              {u.firstName} {u.lastName}
+                            </div>
+                            <div className="text-[11px] text-slate-400 truncate font-medium">
+                              {u.role}
+                            </div>
                           </div>
-                        </div>
-                        {isSelected && <CheckCircle2 className="w-4 h-4 text-sky-400 flex-shrink-0" />}
-                      </button>
-                    );
-                  })}
-                </div>
+                          {isSelected && <CheckCircle2 className="w-4 h-4 text-sky-400 flex-shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {selectedUser && (
@@ -344,15 +362,24 @@ export function LoginForm({ users, onLogin, onRefresh, isSyncing }: LoginFormPro
             </form>
           )}
 
-          {/* WSKAZÓWKA DEMO DLA PRACOWNIKÓW */}
+          {/* WSKAZÓWKA DLA PRACOWNIKÓW */}
           <div className="p-3.5 bg-slate-950/60 rounded-2xl border border-slate-800 text-[11px] text-slate-400 space-y-1">
             <div className="font-bold text-slate-300 flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
               <span>Domyślne hasło dla kont: <code className="text-sky-300 font-mono">password123</code></span>
             </div>
-            <p>
-              Kierownik / Admin: <strong>m.bajda</strong> | Brygadziści: <strong>m.szwajkowski</strong>, <strong>m.małecki</strong>, <strong>j.sarna</strong>
-            </p>
+            {users.length > 0 && (
+              <p>
+                Konta w bazie:{" "}
+                <strong>
+                  {users
+                    .map((u) => u.login || `${u.firstName[0].toLowerCase()}.${u.lastName.toLowerCase()}`)
+                    .slice(0, 6)
+                    .join(", ")}
+                  {users.length > 6 ? "..." : ""}
+                </strong>
+              </p>
+            )}
           </div>
 
         </div>
