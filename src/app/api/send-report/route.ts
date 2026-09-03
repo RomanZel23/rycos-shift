@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     const reportTypeName =
       reportType === "START_SHIFT"
         ? "Rozpoczęcie prac zespołu"
-        : "Zakończenie prac zespołu";
+        : "Zakończenie prac zespołu (Fotorelacja)";
 
     const emailSubject = `[RYCOS Shift] ${reportTypeName} - ${siteName} (${date})`;
 
@@ -51,46 +51,131 @@ export async function POST(req: NextRequest) {
       : pdfBase64;
     const pdfBuffer = Buffer.from(cleanBase64, "base64");
 
+    // 1. Wersja tekstowa (Plain Text Fallback) - kluczowa dla Outlooka i filtrów antyspamowych
+    const textContent = `
+SB TECHNOLOGY | RYCOS Shift
+Oficjalny Raport Dzienny Prac Budowlanych
+
+Typ dokumentu: ${reportTypeName}
+Plac Budowy: ${siteName}
+Brygadzista: ${foremanName}
+Data i godzina: ${date} | ${time}
+
+W załączniku niniejszej wiadomości znajduje się oficjalny dokument raportu dziennego w formacie PDF: ${fileName}
+Zawiera:
+- Listę obecności pracowników oraz ich odręczne podpisy cyfrowe
+- Tematykę instruktażu BHP i zakres robót
+- Dokumentację fotograficzną wykonanych prac
+- Zweryfikowane koordynaty GPS placu budowy
+
+---
+Wiadomość wygenerowana automatycznie przez system RYCOS Shift dla iDream Business Center / SolutionsBay Sp. z o.o.
+Prosimy nie odpowiadać bezpośrednio na ten adres e-mail.
+    `.trim();
+
+    // 2. Wersja HTML (Bulletproof Email HTML z pełnym DOCTYPE i tabelami kompatybilnymi z Outlook/Gmail/Apple Mail)
     const htmlContent = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1e293b; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
-        <div style="background-color: #0f172a; padding: 20px; color: #ffffff;">
-          <h2 style="margin: 0; font-size: 20px; color: #ffffff;">SB TECHNOLOGY | RYCOS Shift</h2>
-          <p style="margin: 4px 0 0 0; font-size: 13px; color: #94a3b8;">Raport dzienny prac budowlanych</p>
-        </div>
-        <div style="padding: 24px; background-color: #ffffff;">
-          <h3 style="margin-top: 0; color: #0f172a; font-size: 18px;">${reportTypeName}</h3>
-          <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 20px;">
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="pl">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>${emailSubject}</title>
+  <style type="text/css">
+    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+    img { -ms-interpolation-mode: bicubic; border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }
+    body { height: 100% !important; margin: 0 !important; padding: 0 !important; width: 100% !important; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+  </style>
+</head>
+<body style="margin: 0; padding: 24px 10px; background-color: #f1f5f9;">
+  <center>
+    <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.06); border: 1px solid #e2e8f0;">
+      <!-- NAGŁÓWEK FIRMOWY -->
+      <tr>
+        <td style="background-color: #0f172a; padding: 24px 28px; text-align: left;">
+          <div style="font-size: 10px; font-weight: 800; color: #38bdf8; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 4px;">
+            SYSTEM RAPORTOWANIA PRAC • RYCOS SHIFT
+          </div>
+          <div style="font-size: 20px; font-weight: 900; color: #ffffff; letter-spacing: 0.5px;">
+            iDream / SolutionsBay
+          </div>
+          <div style="font-size: 13px; color: #94a3b8; margin-top: 4px;">
+            ${reportTypeName}
+          </div>
+        </td>
+      </tr>
+
+      <!-- TREŚĆ GŁÓWNA -->
+      <tr>
+        <td style="padding: 28px; color: #1e293b;">
+          <h2 style="margin: 0 0 16px 0; font-size: 17px; font-weight: 800; color: #0f172a;">
+            Podsumowanie raportu z budowy
+          </h2>
+
+          <!-- TABELA DANYCH (KOMPATYBILNA Z OUTLOOKIEM) -->
+          <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 20px; background-color: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
             <tr>
-              <td style="padding: 8px 0; color: #64748b; width: 140px;"><strong>Plac Budowy:</strong></td>
-              <td style="padding: 8px 0; color: #0f172a;">${siteName}</td>
+              <td style="padding: 10px 14px; font-size: 12px; font-weight: 700; color: #64748b; width: 130px; border-bottom: 1px solid #e2e8f0;">
+                Plac Budowy:
+              </td>
+              <td style="padding: 10px 14px; font-size: 13px; font-weight: 800; color: #0f172a; border-bottom: 1px solid #e2e8f0;">
+                ${siteName}
+              </td>
             </tr>
             <tr>
-              <td style="padding: 8px 0; color: #64748b;"><strong>Brygadzista:</strong></td>
-              <td style="padding: 8px 0; color: #0f172a;">${foremanName}</td>
+              <td style="padding: 10px 14px; font-size: 12px; font-weight: 700; color: #64748b; border-bottom: 1px solid #e2e8f0;">
+                Brygadzista:
+              </td>
+              <td style="padding: 10px 14px; font-size: 13px; font-weight: 800; color: #0f172a; border-bottom: 1px solid #e2e8f0;">
+                ${foremanName}
+              </td>
             </tr>
             <tr>
-              <td style="padding: 8px 0; color: #64748b;"><strong>Data i godzina:</strong></td>
-              <td style="padding: 8px 0; color: #0f172a;">${date} ${time}</td>
+              <td style="padding: 10px 14px; font-size: 12px; font-weight: 700; color: #64748b;">
+                Data i godzina:
+              </td>
+              <td style="padding: 10px 14px; font-size: 13px; font-weight: 800; color: #0f172a;">
+                ${date} • ${time}
+              </td>
             </tr>
           </table>
-          <p style="font-size: 14px; color: #334155; line-height: 1.5;">
-            W załączniku znajduje się oficjalny dokument raportu dziennego w formacie PDF (zawierający listy obecności, podpisy odręczne, dokumentację fotograficzną oraz koordynaty GPS).
-          </p>
-          <div style="margin-top: 24px; padding: 12px; background-color: #f8fafc; border-radius: 6px; font-size: 12px; color: #64748b;">
-            Plik: <strong>${fileName}</strong><br />
-            Status: Wygenerowano i podpisano cyfrowo w terenie.
-          </div>
-        </div>
-        <div style="background-color: #f1f5f9; padding: 12px 24px; font-size: 11px; color: #64748b; text-align: center;">
-          Wiadomość wygenerowana automatycznie przez system RYCOS Shift dla SolutionsBay. Prosimy nie odpowiadać bezpośrednio na tę wiadomość.
-        </div>
-      </div>
-    `;
 
+          <p style="font-size: 13px; line-height: 1.6; color: #334155; margin: 0 0 18px 0;">
+            W załączniku wiadomości przesłano oficjalny dokument protokołu dziennego w formacie <strong>PDF</strong>. Raport zawiera zweryfikowane koordynaty GPS, listę obecności z odręcznymi podpisami pracowników oraz kompletną fotorelację.
+          </p>
+
+          <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f1f5f9; border-left: 4px solid #0284c7; border-radius: 0 6px 6px 0; margin-bottom: 10px;">
+            <tr>
+              <td style="padding: 12px 16px; font-size: 12px; color: #334155;">
+                📎 Załączony plik PDF: <strong>${fileName}</strong><br/>
+                🔒 Status: Wygenerowano automatycznie i podpisano w terenie.
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+
+      <!-- STOPKA -->
+      <tr>
+        <td style="background-color: #f8fafc; padding: 18px 24px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 11px; color: #64748b; line-height: 1.5;">
+          <strong>iDream Business Center • SolutionsBay Sp. z o.o.</strong><br/>
+          Wiadomość wygenerowana automatycznie przez system RYCOS Shift.<br/>
+          Prosimy nie odpowiadać na tę wiadomość e-mail.
+        </td>
+      </tr>
+    </table>
+  </center>
+</body>
+</html>
+    `.trim();
+
+    // Wysyłka z równoczesną częścią HTML oraz Text (pełna specyfikacja MIME multipart/alternative)
     const { data, error } = await resend.emails.send({
       from: `RYCOS Shift <${effectiveFromEmail}>`,
       to: recipients,
       subject: emailSubject,
+      text: textContent,
       html: htmlContent,
       attachments: [
         {
