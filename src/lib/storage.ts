@@ -13,79 +13,68 @@ export const INITIAL_USERS: User[] = [
     createdAt: new Date().toISOString(),
   },
   {
-    id: "usr-foreman-1",
-    firstName: "Jan",
-    lastName: "Kowalski",
-    role: "Brygadzista Główny",
+    id: "usr-1788266623324",
+    firstName: "Marcin",
+    lastName: "Szwajkowski",
+    role: "Brygadzista",
     isForeman: true,
     isAdmin: false,
-    login: "j.kowalski",
+    login: "m.szwajkowski",
     password: "password123",
     createdAt: new Date().toISOString(),
   },
   {
-    id: "usr-foreman-2",
-    firstName: "Marek",
-    lastName: "Wiśniewski",
-    role: "Brygadzista Montażu",
+    id: "usr-1788266635268",
+    firstName: "Krystian",
+    lastName: "Kuszak",
+    role: "Montażysta",
     isForeman: true,
     isAdmin: false,
-    login: "m.wisniewski",
+    login: "k.kuszak",
     password: "password123",
     createdAt: new Date().toISOString(),
   },
   {
-    id: "usr-worker-1",
-    firstName: "Piotr",
-    lastName: "Nowak",
-    role: "Montażysta konstrukcji",
+    id: "usr-1788386270996",
+    firstName: "Maciej",
+    lastName: "Małecki",
+    role: "Brygadzista",
+    isForeman: true,
+    isAdmin: false,
+    login: "m.malecki",
+    password: "password123",
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "usr-1788266682134",
+    firstName: "Kryspin",
+    lastName: "Raczkowiak",
+    role: "Montażysta",
     isForeman: false,
     isAdmin: false,
-    login: "p.nowak",
+    login: "k.raczkowiak",
     password: "password123",
     createdAt: new Date().toISOString(),
   },
   {
-    id: "usr-worker-2",
-    firstName: "Tomasz",
-    lastName: "Zieliński",
-    role: "Cieśla szalunkowy",
-    isForeman: false,
-    isAdmin: false,
-    login: "t.zielinski",
-    password: "password123",
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "usr-worker-3",
+    id: "usr-1788266694969",
     firstName: "Andrzej",
-    lastName: "Wójcik",
-    role: "Zbrojarz",
+    lastName: "Skręty",
+    role: "Montażysta",
     isForeman: false,
     isAdmin: false,
-    login: "a.wojcik",
+    login: "a.skrety",
     password: "password123",
     createdAt: new Date().toISOString(),
   },
   {
-    id: "usr-worker-4",
-    firstName: "Krzysztof",
-    lastName: "Kozłowski",
-    role: "Operator sprzętu",
-    isForeman: false,
+    id: "usr-1788386164376",
+    firstName: "Jarosław",
+    lastName: "Sarna",
+    role: "Montażysta",
+    isForeman: true,
     isAdmin: false,
-    login: "k.kozlowski",
-    password: "password123",
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "usr-worker-5",
-    firstName: "Michał",
-    lastName: "Lewandowski",
-    role: "Pomocnik budowlany",
-    isForeman: false,
-    isAdmin: false,
-    login: "m.lewandowski",
+    login: "j.sarna",
     password: "password123",
     createdAt: new Date().toISOString(),
   },
@@ -211,20 +200,17 @@ export const getStoredUsers = (): User[] => {
       return INITIAL_USERS;
     }
     const parsed: User[] = JSON.parse(data);
-    // Automatyczna migracja jeśli w pamięci telefonu pozostał Roman Administrator
-    const migrated = parsed.map((u) => {
-      if (u.id === "usr-admin-1" && u.firstName === "Roman") {
-        return {
-          ...u,
-          firstName: "Marcin",
-          lastName: "Bajda",
-          login: "m.bajda",
-        };
-      }
-      return u;
-    });
-    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(migrated));
-    return migrated;
+
+    // Automatyczne usunięcie starych danych testowych z pamięci telefonu (Piotr Nowak, Tomasz Zieliński itp.)
+    const hasObsoleteDemoUsers = parsed.some(
+      (u) => u.lastName === "Nowak" || u.lastName === "Zieliński" || u.lastName === "Kowalski"
+    );
+    if (hasObsoleteDemoUsers) {
+      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(INITIAL_USERS));
+      return INITIAL_USERS;
+    }
+
+    return parsed;
   } catch {
     return INITIAL_USERS;
   }

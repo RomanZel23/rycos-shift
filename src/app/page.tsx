@@ -151,7 +151,10 @@ export default function Home() {
       console.warn("Storage hydration notice:", storageErr);
     }
 
-    // Inicjalizacja bazowego stanu historii dla PWA
+    // 1. Natychmiastowa synchronizacja z bazą Supabase przy starcie aplikacji
+    syncWithDatabase();
+
+    // 2. Inicjalizacja bazowego stanu historii dla PWA
     if (typeof window !== "undefined") {
       window.history.replaceState({ tab: "START_SHIFT" }, "");
 
@@ -169,8 +172,6 @@ export default function Home() {
       window.addEventListener("popstate", handlePopState);
       return () => window.removeEventListener("popstate", handlePopState);
     }
-
-    syncWithDatabase();
   }, [syncWithDatabase]);
 
   // Handlery logowania i wylogowania
@@ -258,7 +259,12 @@ export default function Home() {
     return (
       <>
         <PwaInstallPrompt />
-        <LoginForm users={users} onLogin={handleLogin} />
+        <LoginForm
+          users={users}
+          onLogin={handleLogin}
+          onRefresh={syncWithDatabase}
+          isSyncing={isSyncing}
+        />
       </>
     );
   }

@@ -12,14 +12,17 @@ import {
   KeyRound,
   CheckCircle2,
   AlertCircle,
+  RefreshCw,
 } from "lucide-react";
 
 interface LoginFormProps {
   users: UserType[];
   onLogin: (user: UserType) => void;
+  onRefresh?: () => Promise<void>;
+  isSyncing?: boolean;
 }
 
-export function LoginForm({ users, onLogin }: LoginFormProps) {
+export function LoginForm({ users, onLogin, onRefresh, isSyncing }: LoginFormProps) {
   const [activeMode, setActiveMode] = useState<"standard" | "quick">("quick");
   const [loginInput, setLoginInput] = useState("");
   const [passwordInput, setPasswordInput] = useState("");
@@ -185,9 +188,23 @@ export function LoginForm({ users, onLogin }: LoginFormProps) {
           {activeMode === "quick" && (
             <form onSubmit={handleQuickSubmit} className="space-y-5">
               <div>
-                <label className="block text-xs font-black uppercase tracking-wider text-slate-300 mb-2.5">
-                  Wybierz swoje konto:
-                </label>
+                <div className="flex items-center justify-between mb-2.5">
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-300">
+                    Wybierz swoje konto:
+                  </label>
+                  {onRefresh && (
+                    <button
+                      type="button"
+                      onClick={onRefresh}
+                      disabled={isSyncing}
+                      title="Pobierz aktualną listę z bazy Supabase"
+                      className="inline-flex items-center gap-1.5 text-xs text-sky-400 hover:text-sky-300 font-bold transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin" : ""}`} />
+                      <span>{isSyncing ? "Pobieranie..." : "Odśwież bazę"}</span>
+                    </button>
+                  )}
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-56 overflow-y-auto pr-1">
                   {users.map((u) => {
                     const isSelected = selectedUser?.id === u.id;
@@ -334,7 +351,7 @@ export function LoginForm({ users, onLogin }: LoginFormProps) {
               <span>Domyślne hasło dla kont: <code className="text-sky-300 font-mono">password123</code></span>
             </div>
             <p>
-              Kierownik / Admin: <strong>m.bajda</strong> | Brygadziści: <strong>j.kowalski</strong>, <strong>m.wisniewski</strong>
+              Kierownik / Admin: <strong>m.bajda</strong> | Brygadziści: <strong>m.szwajkowski</strong>, <strong>m.małecki</strong>, <strong>j.sarna</strong>
             </p>
           </div>
 
@@ -343,7 +360,7 @@ export function LoginForm({ users, onLogin }: LoginFormProps) {
         {/* STOPKA SYSTEMOWA */}
         <div className="text-center text-xs text-slate-500 space-y-1">
           <div>iDream Business Center • SolutionsBay Sp. z o.o.</div>
-          <div className="font-mono text-[11px] text-slate-600">RYCOS Shift v1.2 (Letterhead Edition)</div>
+          <div className="font-mono text-[11px] text-slate-600">RYCOS Shift v1.3 (Supabase Cloud Connected)</div>
         </div>
 
       </div>
