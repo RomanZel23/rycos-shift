@@ -230,10 +230,10 @@ export function generateStartShiftHtml(report: DailyReport, settings?: TenantSet
       <!-- 6. OFICJALNA STOPKA PAPIERU FIRMOWEGO (DANE REJESTROWE SPÓŁKI) -->
       <div style="margin-top: 24px; padding-top: 12px; border-top: 1px solid #cbd5e1; text-align: center; font-size: 9px; color: #64748b; line-height: 1.45;">
         <div style="font-weight: 800; color: #1e293b; font-size: 9.5px;">
-          iDream Business Center spółka z ograniczoną odpowiedzialnością
+          ${escapeHtml(settings?.organizationName || "iDream Business Center spółka z ograniczoną odpowiedzialnością")}
         </div>
         <div>
-          Kielce, 25-639, ul. Malików 150d, NIP: 9591971466, KRS: 0000612724, REGON: 364221354
+          ${escapeHtml(settings?.logoSubtitle || "Kielce, 25-639, ul. Malików 150d, NIP: 9591971466, KRS: 0000612724, REGON: 364221354")}
         </div>
         <div>
           tel. +48 41 308 00 05, e-mail: <a href="mailto:info@solutionsbay.pl" style="color: #0284c7; text-decoration: none;">info@solutionsbay.pl</a>, <a href="https://www.solutionsbay.pl" style="color: #0284c7; text-decoration: none;">www.solutionsbay.pl</a>
@@ -359,10 +359,10 @@ export function generateEndShiftHtml(report: DailyReport, settings?: TenantSetti
       <!-- 5. OFICJALNA STOPKA PAPIERU FIRMOWEGO (DANE REJESTROWE SPÓŁKI) -->
       <div style="margin-top: 24px; padding-top: 12px; border-top: 1px solid #cbd5e1; text-align: center; font-size: 9px; color: #64748b; line-height: 1.45;">
         <div style="font-weight: 800; color: #1e293b; font-size: 9.5px;">
-          iDream Business Center spółka z ograniczoną odpowiedzialnością
+          ${escapeHtml(settings?.organizationName || "iDream Business Center spółka z ograniczoną odpowiedzialnością")}
         </div>
         <div>
-          Kielce, 25-639, ul. Malików 150d, NIP: 9591971466, KRS: 0000612724, REGON: 364221354
+          ${escapeHtml(settings?.logoSubtitle || "Kielce, 25-639, ul. Malików 150d, NIP: 9591971466, KRS: 0000612724, REGON: 364221354")}
         </div>
         <div>
           tel. +48 41 308 00 05, e-mail: <a href="mailto:info@solutionsbay.pl" style="color: #0284c7; text-decoration: none;">info@solutionsbay.pl</a>, <a href="https://www.solutionsbay.pl" style="color: #0284c7; text-decoration: none;">www.solutionsbay.pl</a>

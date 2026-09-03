@@ -62,9 +62,7 @@ export function StartShiftForm({
     accuracy: null,
   });
 
-  const [discussedTopics, setDiscussedTopics] = useState<string[]>([
-    "Szkolenie BHP i instruktaż stanowiskowy przed rozpoczęciem prac",
-  ]);
+  const [discussedTopics, setDiscussedTopics] = useState<string[]>([]);
 
   const [attendanceList, setAttendanceList] = useState<AttendanceRecord[]>([]);
 
@@ -93,7 +91,11 @@ export function StartShiftForm({
     if (foremen.length > 0 && !foremanId) {
       setForemanId(foremen[0].id);
     }
-  }, [sites, users, siteId, foremanId]);
+
+    if (topicTemplates && topicTemplates.length > 0 && discussedTopics.length === 0) {
+      setDiscussedTopics([topicTemplates[0].title]);
+    }
+  }, [sites, users, topicTemplates, siteId, foremanId, discussedTopics.length]);
 
   const foremen = users.filter((u) => u.isForeman);
   const selectedForeman = users.find((u) => u.id === foremanId);

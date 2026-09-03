@@ -257,6 +257,7 @@ export default function Home() {
         <PwaInstallPrompt />
         <LoginForm
           users={users}
+          settings={settings}
           onLogin={handleLogin}
           onRefresh={syncWithDatabase}
           isSyncing={isSyncing}
@@ -337,7 +338,7 @@ export default function Home() {
       <footer className="hidden sm:block border-t border-slate-200 dark:border-slate-800/80 py-6 text-center text-xs text-slate-500 bg-white/60 dark:bg-slate-900/60 mt-auto">
         <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <div>
-            <strong>iDream Business Center</strong> • SolutionsBay Sp. z o.o.
+            <strong>{settings?.organizationName || "iDream Business Center"}</strong> • {settings?.logoSubtitle || "SolutionsBay Sp. z o.o."}
           </div>
           <div>
             System RYCOS Shift — Raportowanie odpraw i fotorelacji z budowy

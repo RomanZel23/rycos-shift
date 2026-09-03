@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { User as UserType } from "@/types";
+import { User as UserType, TenantSettings } from "@/types";
 import {
   Lock,
   User as UserIcon,
@@ -17,12 +17,13 @@ import {
 
 interface LoginFormProps {
   users: UserType[];
+  settings?: TenantSettings;
   onLogin: (user: UserType) => void;
   onRefresh?: () => Promise<void>;
   isSyncing?: boolean;
 }
 
-export function LoginForm({ users, onLogin, onRefresh, isSyncing }: LoginFormProps) {
+export function LoginForm({ users, settings, onLogin, onRefresh, isSyncing }: LoginFormProps) {
   const [activeMode, setActiveMode] = useState<"standard" | "quick">("quick");
   const [loginInput, setLoginInput] = useState("");
   const [passwordInput, setPasswordInput] = useState("");
@@ -386,7 +387,7 @@ export function LoginForm({ users, onLogin, onRefresh, isSyncing }: LoginFormPro
 
         {/* STOPKA SYSTEMOWA */}
         <div className="text-center text-xs text-slate-500 space-y-1">
-          <div>iDream Business Center • SolutionsBay Sp. z o.o.</div>
+          <div>{settings?.organizationName || "iDream Business Center"} • {settings?.logoSubtitle || "SolutionsBay Sp. z o.o."}</div>
           <div className="font-mono text-[11px] text-slate-600">RYCOS Shift v1.3 (Supabase Cloud Connected)</div>
         </div>
 

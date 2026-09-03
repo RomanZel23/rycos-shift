@@ -25,7 +25,6 @@ import {
   TenantSettings,
   PdfTemplate,
 } from "@/types";
-import { INITIAL_PDF_TEMPLATES } from "@/lib/storage";
 
 interface AdminSettingsProps {
   users: User[];
@@ -45,7 +44,7 @@ export function AdminSettings({
   sites,
   topicTemplates,
   settings,
-  pdfTemplates = INITIAL_PDF_TEMPLATES,
+  pdfTemplates = [],
   onUpdateUsers,
   onUpdateSites,
   onUpdateTopics,
@@ -829,7 +828,7 @@ export function AdminSettings({
             <button
               type="button"
               onClick={() => {
-                const def = INITIAL_PDF_TEMPLATES.find((t) => t.reportType === selectedTemplateType);
+                const def = pdfTemplates.find((t) => t.reportType === selectedTemplateType);
                 if (def) setTemplateCode(def.htmlContent);
               }}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold cursor-pointer"

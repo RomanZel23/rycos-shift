@@ -74,11 +74,11 @@ export function Header({
                   RYCOS <span className="text-sky-400">Shift</span>
                 </span>
                 <span className="hidden sm:inline-block px-2.5 py-0.5 bg-sky-500/25 text-sky-300 text-xs font-black rounded-lg uppercase tracking-wider border border-sky-500/40">
-                  SolutionsBay
+                  {settings.logoText || "SolutionsBay"}
                 </span>
               </div>
               <p className="text-xs sm:text-sm text-slate-300 font-semibold">
-                iDream Business Center • Raporty Budowy
+                {settings.organizationName || "iDream Business Center"} • Raporty Budowy
               </p>
             </div>
           </div>

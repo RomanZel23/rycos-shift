@@ -37,16 +37,7 @@ export function GeoLocationBadge({ onLocationChange, location }: GeoLocationBadg
       (err) => {
         setLoading(false);
         console.warn("Geolocation warning:", err.message);
-        // Fallback default coordinates (Poznań center) if permission blocked
-        if (!location.latitude) {
-          const fallback: GeoLocationData = {
-            latitude: 52.4064,
-            longitude: 16.9252,
-            accuracy: 50,
-          };
-          if (onLocationChange) onLocationChange(fallback);
-        }
-        setErrorMsg("Brak uprawnień GPS (użyto współrzędnych placu)");
+        setErrorMsg("Brak uprawnień GPS na tym urządzeniu");
       },
       {
         enableHighAccuracy: true,
