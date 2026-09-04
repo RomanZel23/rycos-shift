@@ -98,18 +98,6 @@ export async function generateReportPDFAsync(
         )
       );
 
-      // Renderowanie HTML do Canvas z podwojoną rozdzielczością dla kryształowej ostrości
-      const canvas = await html2canvas(container, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        imageTimeout: 15000,
-        logging: false,
-        backgroundColor: "#ffffff",
-      });
-
-      const imgData = canvas.toDataURL("image/jpeg", 0.95);
-
       const pdf = new jsPDF({
         orientation: "portrait",
         unit: "mm",
@@ -119,22 +107,39 @@ export async function generateReportPDFAsync(
       const pdfWidth = pdf.internal.pageSize.getWidth(); // 210mm
       const pdfHeight = pdf.internal.pageSize.getHeight(); // 297mm
 
-      const imgWidth = pdfWidth;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      // Pobierz wszystkie zdefiniowane strony A4
+      const pageElements = Array.from(container.querySelectorAll<HTMLElement>(".pdf-page"));
 
-      let heightLeft = imgHeight;
-      let position = 0;
+      if (pageElements.length > 0) {
+        for (let i = 0; i < pageElements.length; i++) {
+          const pageElem = pageElements[i];
+          const canvas = await html2canvas(pageElem, {
+            scale: 2,
+            useCORS: true,
+            allowTaint: true,
+            imageTimeout: 15000,
+            logging: false,
+            backgroundColor: "#ffffff",
+          });
 
-      // Pierwsza strona
-      pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
-      heightLeft -= pdfHeight;
-
-      // Obsługa wielostronicowości – dodaj kolejną stronę tylko jeśli pozostała treść ma więcej niż 8mm (eliminuje pustą 2. stronę przy zaokrągleniach pikseli)
-      while (heightLeft > 8) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
-        heightLeft -= pdfHeight;
+          const imgData = canvas.toDataURL("image/jpeg", 0.95);
+          if (i > 0) {
+            pdf.addPage();
+          }
+          pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight);
+        }
+      } else {
+        // Fallback dla pojedynczego kontenera
+        const canvas = await html2canvas(container, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          imageTimeout: 15000,
+          logging: false,
+          backgroundColor: "#ffffff",
+        });
+        const imgData = canvas.toDataURL("image/jpeg", 0.95);
+        pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight);
       }
 
       const blob = pdf.output("blob");

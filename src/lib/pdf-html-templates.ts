@@ -70,12 +70,40 @@ function renderPhotoDocBadge(): string {
   `;
 }
 
-function renderPhotoNumberBadge(idx: number): string {
+function renderCorporateFooter(settings?: TenantSettings): string {
   return `
-    <svg width="84" height="22" viewBox="0 0 84 22" style="position: absolute; top: 8px; left: 8px; display: block; border-radius: 4px; overflow: hidden;">
-      <rect width="84" height="22" rx="4" fill="#0f172a" fill-opacity="0.9" />
-      <text x="42" y="11" fill="#ffffff" font-size="9" font-weight="900" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" text-anchor="middle" dominant-baseline="central" letter-spacing="0.5">ZDJĘCIE #${idx + 1}</text>
-    </svg>
+    <div style="margin-top: auto; padding-top: 12px; border-top: 1px solid #cbd5e1; text-align: center; font-size: 9px; color: #64748b; line-height: 1.45;">
+      <div style="font-weight: 800; color: #1e293b; font-size: 9.5px;">
+        ${escapeHtml(settings?.organizationName || "iDream Business Center spółka z ograniczoną odpowiedzialnością")}
+      </div>
+      <div>
+        ${escapeHtml(settings?.logoSubtitle || "Kielce, 25-639, ul. Malików 150d, NIP: 9591971466, KRS: 0000612724, REGON: 364221354")}
+      </div>
+      <div>
+        tel. +48 41 308 00 05, e-mail: <a href="mailto:info@solutionsbay.pl" style="color: #0284c7; text-decoration: none;">info@solutionsbay.pl</a>, <a href="https://www.solutionsbay.pl" style="color: #0284c7; text-decoration: none;">www.solutionsbay.pl</a>
+      </div>
+      <div style="margin-top: 6px; font-size: 8px; color: #94a3b8;">
+        Dokument wygenerowany automatycznie w systemie RYCOS Shift • Data wygenerowania: ${formatPolishDateTime()}
+      </div>
+    </div>
+  `;
+}
+
+function renderPhotoCard(photo: { photoDataUrl?: string; description?: string; takenAt?: string }, idx: number): string {
+  return `
+    <div style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; height: 265px; box-sizing: border-box;">
+      <div style="height: 195px; background-color: #0f172a; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+        <img src="${photo.photoDataUrl || ""}" alt="Fotografia ${idx + 1}" style="width: 100%; height: 100%; object-fit: cover; display: block;" />
+      </div>
+      <div style="padding: 8px 12px; flex: 1; display: flex; flex-direction: column; justify-content: space-between; background-color: #ffffff;">
+        <div style="font-size: 11px; font-weight: 700; color: #1e293b; line-height: 1.35; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
+          ${escapeHtml(photo.description || "Dokumentacja stanu robót na placu budowy.")}
+        </div>
+        <div style="font-size: 9px; color: #64748b; font-family: monospace; margin-top: 4px;">
+          Wykonano: ${formatPolishTime(photo.takenAt || "")}
+        </div>
+      </div>
+    </div>
   `;
 }
 
@@ -128,22 +156,17 @@ export function generateStartShiftHtml(report: DailyReport, settings?: TenantSet
     .join("");
 
   return `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; width: 794px; min-height: 1115px; background-color: #ffffff; color: #0f172a; padding: 34px 44px; box-sizing: border-box; position: relative; display: flex; flex-direction: column; justify-content: space-between;">
+    <div class="pdf-page" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; width: 794px; min-height: 1123px; height: 1123px; background-color: #ffffff; color: #0f172a; padding: 34px 44px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden;">
       
       <div>
         <!-- 1. OFICJALNY NAGŁÓWEK PAPIERU FIRMOWEGO (idream.png / sb-logo inline SVG) -->
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 14px; margin-bottom: 18px;">
-          
-          <!-- Logo Lewe: iDream Business Center (idream.png) -->
           <div style="display: flex; align-items: center;">
             <img src="/idream.png" alt="iDream Business Center" style="height: 42px; width: 106px; object-fit: contain; display: block;" />
           </div>
-
-          <!-- Logo Prawe: SolutionsBay (Wektorowy SVG) -->
           <div style="display: flex; align-items: center;">
             ${SB_LOGO_INLINE_SVG}
           </div>
-
         </div>
 
         <!-- 2. TYTUŁ DOKUMENTU I METADANE -->
@@ -227,70 +250,44 @@ export function generateStartShiftHtml(report: DailyReport, settings?: TenantSet
         </div>
       </div>
 
-      <!-- 6. OFICJALNA STOPKA PAPIERU FIRMOWEGO (DANE REJESTROWE SPÓŁKI) -->
-      <div style="margin-top: 24px; padding-top: 12px; border-top: 1px solid #cbd5e1; text-align: center; font-size: 9px; color: #64748b; line-height: 1.45;">
-        <div style="font-weight: 800; color: #1e293b; font-size: 9.5px;">
-          ${escapeHtml(settings?.organizationName || "iDream Business Center spółka z ograniczoną odpowiedzialnością")}
-        </div>
-        <div>
-          ${escapeHtml(settings?.logoSubtitle || "Kielce, 25-639, ul. Malików 150d, NIP: 9591971466, KRS: 0000612724, REGON: 364221354")}
-        </div>
-        <div>
-          tel. +48 41 308 00 05, e-mail: <a href="mailto:info@solutionsbay.pl" style="color: #0284c7; text-decoration: none;">info@solutionsbay.pl</a>, <a href="https://www.solutionsbay.pl" style="color: #0284c7; text-decoration: none;">www.solutionsbay.pl</a>
-        </div>
-        <div style="margin-top: 6px; font-size: 8px; color: #94a3b8;">
-          Dokument wygenerowany automatycznie w systemie RYCOS Shift • Data wygenerowania: ${formatPolishDateTime()}
-        </div>
-      </div>
-
+      <!-- 6. OFICJALNA STOPKA PAPIERU FIRMOWEGO -->
+      ${renderCorporateFooter(settings)}
     </div>
   `;
 }
 
 /**
  * Szablon HTML dla Raportu Zakończenia Prac (End Shift - Fotorelacja)
+ * Dzieli fotografie na niezależne strony A4 (4 zdjęcia na stronie 1, do 6 zdjęć na kolejnych stronach).
  */
 export function generateEndShiftHtml(report: DailyReport, settings?: TenantSettings): string {
-  const photosHtml = (report.photoDocumentation || [])
-    .map(
-      (photo, idx) => `
-      <div style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden; page-break-inside: avoid; display: flex; flex-direction: column;">
-        <div style="height: 200px; background-color: #0f172a; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative;">
-          <img src="${
-            photo.photoDataUrl
-          }" alt="Zdjęcie ${idx + 1}" style="width: 100%; height: 100%; object-fit: cover;" />
-          ${renderPhotoNumberBadge(idx)}
-        </div>
-        <div style="padding: 10px 12px; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
-          <div style="font-size: 11px; font-weight: 700; color: #1e293b; line-height: 1.35;">${escapeHtml(
-            photo.description
-          )}</div>
-          <div style="font-size: 9px; color: #64748b; font-family: monospace; margin-top: 6px;">Wykonano: ${formatPolishTime(
-            photo.takenAt || report.time
-          )}</div>
-        </div>
-      </div>
-    `
-    )
-    .join("");
+  const allPhotos = report.photoDocumentation || [];
+  
+  // Strona 1 mieści dokładnie 4 fotografie
+  const page1Photos = allPhotos.slice(0, 4);
+  const remainingPhotos = allPhotos.slice(4);
 
-  return `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; width: 794px; min-height: 1115px; background-color: #ffffff; color: #0f172a; padding: 34px 44px; box-sizing: border-box; position: relative; display: flex; flex-direction: column; justify-content: space-between;">
-      
+  // Podział pozostałych zdjęć na paczki po 6 na stronę
+  const subsequentPages: Array<typeof allPhotos> = [];
+  for (let i = 0; i < remainingPhotos.length; i += 6) {
+    subsequentPages.push(remainingPhotos.slice(i, i + 6));
+  }
+
+  const totalPages = 1 + subsequentPages.length;
+  const isSinglePage = totalPages === 1;
+
+  // Renderowanie STRONY 1
+  const page1Html = `
+    <div class="pdf-page" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; width: 794px; height: 1123px; background-color: #ffffff; color: #0f172a; padding: 34px 44px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; margin-bottom: 20px;">
       <div>
-        <!-- 1. OFICJALNY NAGŁÓWEK PAPIERU FIRMOWEGO (idream.png / sb-logo inline SVG) -->
+        <!-- 1. OFICJALNY NAGŁÓWEK PAPIERU FIRMOWEGO -->
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 14px; margin-bottom: 18px;">
-          
-          <!-- Logo Lewe: iDream Business Center (idream.png) -->
           <div style="display: flex; align-items: center;">
             <img src="/idream.png" alt="iDream Business Center" style="height: 42px; width: 106px; object-fit: contain; display: block;" />
           </div>
-
-          <!-- Logo Prawe: SolutionsBay (Wektorowy SVG) -->
           <div style="display: flex; align-items: center;">
             ${SB_LOGO_INLINE_SVG}
           </div>
-
         </div>
 
         <!-- 2. TYTUŁ DOKUMENTU I METADANE -->
@@ -305,7 +302,7 @@ export function generateEndShiftHtml(report: DailyReport, settings?: TenantSetti
         </div>
 
         <!-- 3. KARTA PLACU BUDOWY I LOKALIZACJI -->
-        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 18px; margin-bottom: 20px;">
+        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 18px; margin-bottom: 18px;">
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
             <div>
               <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">Plac Budowy:</div>
@@ -341,37 +338,63 @@ export function generateEndShiftHtml(report: DailyReport, settings?: TenantSetti
           </div>
         </div>
 
-        <!-- 4. SEKCJA: DOKUMENTACJA FOTOGRAFICZNA -->
-        <div style="margin-bottom: 24px;">
+        <!-- 4. SEKCJA: DOKUMENTACJA FOTOGRAFICZNA (STRONA 1 - MAX 4 ZDJĘCIA) -->
+        <div>
           <div style="font-size: 12px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #4f46e5; padding-bottom: 4px; margin-bottom: 12px;">
-            Dokumentacja fotograficzna wykonanych robót
+            Dokumentacja fotograficzna wykonanych robót ${totalPages > 1 ? `(1/${totalPages})` : ""}
           </div>
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
             ${
-              photosHtml ||
-              '<div style="grid-column: span 2; padding: 24px; text-align: center; color: #64748b; border: 1px dashed #cbd5e1; border-radius: 8px;">Brak załączonych fotografii</div>'
+              page1Photos.length > 0
+                ? page1Photos.map((p, idx) => renderPhotoCard(p, idx)).join("")
+                : '<div style="grid-column: span 2; padding: 24px; text-align: center; color: #64748b; border: 1px dashed #cbd5e1; border-radius: 8px;">Brak załączonych fotografii</div>'
             }
           </div>
         </div>
       </div>
 
-      <!-- 5. OFICJALNA STOPKA PAPIERU FIRMOWEGO (DANE REJESTROWE SPÓŁKI) -->
-      <div style="margin-top: 24px; padding-top: 12px; border-top: 1px solid #cbd5e1; text-align: center; font-size: 9px; color: #64748b; line-height: 1.45;">
-        <div style="font-weight: 800; color: #1e293b; font-size: 9.5px;">
-          ${escapeHtml(settings?.organizationName || "iDream Business Center spółka z ograniczoną odpowiedzialnością")}
-        </div>
-        <div>
-          ${escapeHtml(settings?.logoSubtitle || "Kielce, 25-639, ul. Malików 150d, NIP: 9591971466, KRS: 0000612724, REGON: 364221354")}
-        </div>
-        <div>
-          tel. +48 41 308 00 05, e-mail: <a href="mailto:info@solutionsbay.pl" style="color: #0284c7; text-decoration: none;">info@solutionsbay.pl</a>, <a href="https://www.solutionsbay.pl" style="color: #0284c7; text-decoration: none;">www.solutionsbay.pl</a>
-        </div>
-        <div style="margin-top: 6px; font-size: 8px; color: #94a3b8;">
-          Dokument wygenerowany automatycznie w systemie RYCOS Shift • Data wygenerowania: ${formatPolishDateTime()}
-        </div>
-      </div>
+      ${isSinglePage ? renderCorporateFooter(settings) : ""}
+    </div>
+  `;
 
+  // Renderowanie KOLEJNYCH STRON (po 6 zdjęć na stronę)
+  const otherPagesHtml = subsequentPages
+    .map((pagePhotos, pageIdx) => {
+      const pageNum = pageIdx + 2;
+      const isLastPage = pageNum === totalPages;
+      const baseIdx = 4 + pageIdx * 6;
+
+      return `
+        <div class="pdf-page" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; width: 794px; height: 1123px; background-color: #ffffff; color: #0f172a; padding: 34px 44px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; margin-bottom: 20px;">
+          <div>
+            <!-- NAGŁÓWEK KONTYNUACJI -->
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 10px; margin-bottom: 16px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 12px; font-weight: 900; color: #0f172a; text-transform: uppercase;">PROTOKÓŁ ZAKOŃCZENIA PRAC (FOTORELACJA - c.d.)</span>
+                <span style="font-size: 11px; font-weight: 700; color: #64748b;">• ${escapeHtml(report.siteName)}</span>
+              </div>
+              <div style="font-size: 11px; font-weight: 700; color: #64748b; font-family: monospace;">
+                Strona ${pageNum} z ${totalPages}
+              </div>
+            </div>
+
+            <!-- SIATKA 6 FOTOGRAFII -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+              ${pagePhotos.map((p, idx) => renderPhotoCard(p, baseIdx + idx)).join("")}
+            </div>
+          </div>
+
+          ${isLastPage ? renderCorporateFooter(settings) : ""}
+        </div>
+      `;
+    })
+    .join("");
+
+  return `
+    <div style="background-color: #ffffff;">
+      ${page1Html}
+      ${otherPagesHtml}
     </div>
   `;
 }
