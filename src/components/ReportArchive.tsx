@@ -108,17 +108,18 @@ export function ReportArchive({
   });
 
   const handleDownload = async (report: DailyReport) => {
-    // Jeśli plik PDF znajduje się już w Supabase Storage Bucket, otwórz bezpośrednio z CDN
-    if (report.pdfDataUrl && report.pdfDataUrl.startsWith("http")) {
-      window.open(report.pdfDataUrl, "_blank");
-      return;
+    try {
+      const result = await generateReportPDFAsync(report, settings);
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(result.blob);
+      link.download = result.fileName;
+      link.click();
+    } catch (err) {
+      console.warn("Dynamic PDF generation fallback:", err);
+      if (report.pdfDataUrl && report.pdfDataUrl.startsWith("http")) {
+        window.open(report.pdfDataUrl, "_blank");
+      }
     }
-
-    const result = await generateReportPDFAsync(report);
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(result.blob);
-    link.download = result.fileName;
-    link.click();
   };
 
   const handleResendEmail = async (report: DailyReport) => {
@@ -126,15 +127,10 @@ export function ReportArchive({
       setResendingId(report.id);
       setResendStatus(null);
 
-      // 1. Upewnij się, że mamy PDF DataURL (lub wygeneruj w razie potrzeby)
-      let pdfBase64 = report.pdfDataUrl || "";
-      let fileName = sanitizePdfFileName(report.pdfFileName || `Raport_${report.reportType}_${report.date}.pdf`);
-
-      if (!pdfBase64) {
-        const result = await generateReportPDFAsync(report);
-        pdfBase64 = result.dataUrl;
-        fileName = result.fileName;
-      }
+      // Zawsze wygeneruj najświeższy, idealnie sformatowany PDF w nowym układzie stron
+      const result = await generateReportPDFAsync(report, settings);
+      const pdfBase64 = result.dataUrl;
+      const fileName = result.fileName;
 
       // 2. Zawsze używaj aktualnych odbiorców zdefiniowanych w Ustawieniach
       const configuredRecipients =
