@@ -91,7 +91,7 @@ export function EndShiftForm({
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement("canvas");
-        const MAX_WIDTH = 1200;
+        const MAX_WIDTH = 1024;
         let width = img.width;
         let height = img.height;
 
@@ -105,7 +105,7 @@ export function EndShiftForm({
         const ctx = canvas.getContext("2d");
         if (ctx) {
           ctx.drawImage(img, 0, 0, width, height);
-          const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.75);
+          const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.70);
           setTempPhotoUrl(compressedDataUrl);
           setTempDescription("");
           setIsAddingPhoto(true);

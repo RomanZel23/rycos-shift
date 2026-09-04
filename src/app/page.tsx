@@ -27,6 +27,7 @@ import {
   getStoredSettings,
   saveStoredSettings,
   getStoredReports,
+  saveStoredReport,
   getStoredPdfTemplates,
   saveStoredPdfTemplates,
   getStoredLoggedUser,
@@ -93,9 +94,31 @@ export default function Home() {
           saveStoredSettings(dbSettings);
         }
         if (Array.isArray(dbReports)) {
-          setReports(dbReports);
+          // Sprawdź, czy na urządzeniu są raporty, które jeszcze nie zdążyły trafić do bazy Supabase
+          const localReports = getStoredReports();
+          const missingInCloud = localReports.filter(
+            (local) => !dbReports.some((db) => db.id === local.id)
+          );
+
+          if (missingInCloud.length > 0) {
+            console.log(`Wykryto ${missingInCloud.length} lokalnych raportów do dosłania do Supabase`);
+            // Wyślij brakujące raporty w tle do Supabase
+            for (const missing of missingInCloud) {
+              fetch("/api/db/sync", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "SAVE_REPORT", report: missing }),
+              }).catch((err) => console.warn("Auto-sync missing report error:", err));
+            }
+          }
+
+          const mergedReports = [
+            ...missingInCloud,
+            ...dbReports,
+          ];
+          setReports(mergedReports);
           try {
-            localStorage.setItem("rycos_shift_reports_v1", JSON.stringify(dbReports));
+            localStorage.setItem("rycos_shift_reports_v1", JSON.stringify(mergedReports));
           } catch {}
         }
         if (Array.isArray(dbTemplates)) {
@@ -219,13 +242,22 @@ export default function Home() {
     }).catch(() => {});
   };
 
-  const handleReportCreated = (newReport: DailyReport) => {
+  const handleReportCreated = async (newReport: DailyReport) => {
     setReports((prev) => [newReport, ...prev]);
-    fetch("/api/db/sync", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "SAVE_REPORT", report: newReport }),
-    }).catch(() => {});
+    saveStoredReport(newReport);
+    try {
+      const res = await fetch("/api/db/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "SAVE_REPORT", report: newReport }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        console.warn("Zapis do bazy danych zwrócił błąd:", data.message);
+      }
+    } catch (err) {
+      console.warn("Błąd sieciowy podczas zapisu raportu do Supabase:", err);
+    }
   };
 
   // JEŚLI UŻYTKOWNIK NIE JEST ZALOGOWANY -> POKAŻ OD RAZU EKRAN LOGOWANIA
