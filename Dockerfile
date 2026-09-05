@@ -68,11 +68,32 @@ ENV PUPPETEER_SKIP_DOWNLOAD=1
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
+# Chromium potrzebuje zapisywalnego HOME i katalogu na profil oraz zrzuty
+# awaryjne. Bez tego proces `chrome_crashpad_handler` dostaje puste `--database`
+# i przewraca całą przeglądarkę przy starcie — awaria z 2026-09-05, przez którą
+# nie dało się złożyć ani jednego raportu. Szczegóły w src/lib/pdf-renderer.ts.
+ENV HOME=/home/nextjs
+ENV CHROMIUM_WORK_DIR=/home/nextjs/chromium
+RUN mkdir -p /home/nextjs/chromium \
+ && chown -R nextjs:nodejs /home/nextjs
+
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 USER nextjs
+
+# Sprawdzenie przy budowaniu obrazu, że Chromium W OGÓLE WSTAJE na tym
+# użytkowniku i z tymi katalogami. `apt-get install chromium` nie jest przypięty
+# do wersji, więc każda przebudowa może przynieść inną. Lepiej, żeby Coolify
+# pokazał czerwony build, niż żeby brygadzista dowiedział się o tym na budowie
+# po wypełnieniu całej odprawy.
+RUN chromium --headless --no-sandbox --disable-gpu \
+      --user-data-dir=/home/nextjs/chromium/profile \
+      --crash-dumps-dir=/home/nextjs/chromium/crashes \
+      --disable-crash-reporter --disable-breakpad \
+      --dump-dom about:blank > /dev/null \
+ && echo "Chromium OK"
 
 EXPOSE 3000
 

@@ -4,7 +4,7 @@ import { requireUser, withRefreshedSession } from "@/lib/auth";
 import { optimizeReportForStorage } from "@/lib/supabase-storage";
 import { BUCKET_NAME, storagePathFromRef, toAppFileUrl } from "@/lib/storage-paths";
 import { generateEndShiftHtml, generateStartShiftHtml } from "@/lib/pdf-html-templates";
-import { renderHtmlToPdf } from "@/lib/pdf-renderer";
+import { renderHtmlToPdf, BrowserLaunchError } from "@/lib/pdf-renderer";
 import { loadLogoDataUrl, mediaAsDataUrls } from "@/lib/pdf-assets";
 import { resolveEmailConfig, sendReportEmail } from "@/lib/email";
 import { sanitizePdfFileName } from "@/lib/pdf-generator";
@@ -105,8 +105,17 @@ export async function POST(req: NextRequest) {
       } — ${report.siteName} — ${report.date}`,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "nieznany błąd";
     console.error("PDF render error:", err);
+
+    // Awaria samej przeglądarki ma własny, krótki komunikat. Wcześniej na
+    // telefon brygadzisty trafiał surowy stderr Chromium razem ze ścieżkami
+    // wewnętrznymi i linkiem do dokumentacji puppeteera — nieczytelne dla
+    // niego i niepotrzebnie odsłaniające budowę serwera.
+    if (err instanceof BrowserLaunchError) {
+      return NextResponse.json({ success: false, message: err.message }, { status: 503 });
+    }
+
+    const message = err instanceof Error ? err.message : "nieznany błąd";
     return NextResponse.json(
       { success: false, message: `Nie udało się wygenerować dokumentu PDF: ${message}` },
       { status: 500 }
