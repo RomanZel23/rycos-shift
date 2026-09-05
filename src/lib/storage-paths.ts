@@ -26,6 +26,36 @@ export function pathFromAppFileUrl(value?: string | null): string | null {
 }
 
 /**
+ * Ścieżka w buckecie z DOWOLNEJ historycznej formy odwołania.
+ *
+ * W bazie leżą trzy pokolenia wartości:
+ *   1. publiczny URL CDN  (raporty z 2026-09-02 i późniejsze),
+ *   2. /api/files?path=…  (raporty tworzone od Etapu 0),
+ *   3. data:…base64       (najstarsze raporty — plik siedzi w kolumnie, nie w buckecie;
+ *                          dla nich funkcja zwraca null i trzeba użyć samego base64).
+ *
+ * pathFromAppFileUrl obsługuje tylko formę 2, więc kod czytający prosto z bazy
+ * musi używać tej funkcji, inaczej nie znajdzie plików starszych raportów.
+ */
+export function storagePathFromRef(value?: string | null): string | null {
+  if (typeof value !== "string" || value.length === 0) return null;
+  if (value.startsWith("data:")) return null;
+
+  const fromApp = pathFromAppFileUrl(value);
+  if (fromApp) return fromApp;
+
+  for (const marker of [PUBLIC_URL_MARKER, SIGNED_URL_MARKER]) {
+    const idx = value.indexOf(marker);
+    if (idx >= 0) {
+      const path = value.slice(idx + marker.length).split("?")[0];
+      if (isAllowedStoragePath(path)) return path;
+    }
+  }
+
+  return isAllowedStoragePath(value) ? value : null;
+}
+
+/**
  * Sprowadza dowolną historyczną formę odwołania do pliku (publiczny URL CDN,
  * podpisany URL, gołą ścieżkę) do adresu same-origin /api/files.
  * Data URL-e i obce adresy zostawia bez zmian.

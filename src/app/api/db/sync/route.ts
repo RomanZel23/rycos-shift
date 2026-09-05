@@ -7,11 +7,16 @@ import {
   TenantSettings,
   DailyReport,
   PdfTemplate,
-  AttendanceRecord,
-  PhotoDocumentationItem,
 } from "@/types";
 import { optimizeReportForStorage } from "@/lib/supabase-storage";
-import { normalizeStoredFileRef } from "@/lib/storage-paths";
+import { storagePathFromRef } from "@/lib/storage-paths";
+import {
+  REPORTS_TABLE,
+  REPORT_COLUMNS,
+  ReportRow,
+  rowToDailyReport,
+  dailyReportToRow,
+} from "@/lib/report-mapper";
 import { forbidden, requireUser, withRefreshedSession } from "@/lib/auth";
 
 export const runtime = "nodejs";
@@ -53,7 +58,7 @@ export async function GET(req: NextRequest) {
       supabase.from("construction_sites").select("*").order("name", { ascending: true }),
       supabase.from("topic_templates").select("*").order("created_at", { ascending: true }),
       supabase.from("tenant_settings").select("*").limit(1).maybeSingle(),
-      supabase.from("daily_reports").select("*").order("created_at", { ascending: false }),
+      supabase.from(REPORTS_TABLE).select(REPORT_COLUMNS).order("report_date", { ascending: false }),
       supabase.from("pdf_templates").select("*").order("created_at", { ascending: true }),
     ]);
 
@@ -99,37 +104,11 @@ export async function GET(req: NextRequest) {
       };
     }
 
-    // Mapowanie raportów.
-    // Etap 0: bucket jest już prywatny, więc historyczne publiczne URL-e CDN
-    // przepisujemy na adresy same-origin /api/files?path=...
-    const reports: DailyReport[] = (reportsRes.data || []).map((row) => ({
-      id: row.id,
-      tenantId: row.tenant_id,
-      reportType: row.report_type,
-      date: row.date,
-      time: row.time,
-      siteId: row.site_id,
-      siteName: row.site_name,
-      foremanId: row.foreman_id,
-      foremanName: row.foreman_name,
-      location: row.location || {},
-      discussedTopics: row.discussed_topics || [],
-      attendanceList: (row.attendance_list || []).map((att: AttendanceRecord) => ({
-        ...att,
-        signatureDataUrl: normalizeStoredFileRef(att?.signatureDataUrl),
-      })),
-      photoDocumentation: (row.photo_documentation || []).map(
-        (photo: PhotoDocumentationItem) => ({
-          ...photo,
-          photoDataUrl: normalizeStoredFileRef(photo?.photoDataUrl),
-        })
-      ),
-      pdfFileName: row.pdf_file_name,
-      pdfDataUrl: normalizeStoredFileRef(row.pdf_data_url),
-      sentToEmails: row.sent_to_emails || [],
-      sentAt: row.sent_at,
-      status: row.status,
-    }));
+    // Mapowanie raportów — cała logika (ścieżka w buckecie -> /api/files)
+    // siedzi w report-mapper, żeby był jeden punkt prawdy dla wszystkich route'ów.
+    const reports: DailyReport[] = ((reportsRes.data || []) as unknown as ReportRow[]).map(
+      rowToDailyReport
+    );
 
     // Mapowanie szablonów PDF
     const pdfTemplates: PdfTemplate[] = (templatesRes.data || []).map((row) => ({
@@ -192,32 +171,25 @@ export async function POST(req: NextRequest) {
       return forbidden();
     }
 
-    // 1. Zapis/Aktualizacja nowego raportu dziennego (z optymalizacją Storage Bucket)
+    // 1. Dosłanie raportu z kolejki offline. Nowe raporty idą przez /api/reports
+    // (multipart + wysyłka maila); tutaj lądują tylko te, którym zapis padł
+    // przy składaniu — dlatego status zostaje FAILED, a mail wysyła się ręcznie
+    // z Archiwum po odzyskaniu łączności.
     if (action === "SAVE_REPORT" && report) {
-      // Optymalizacja: wyślij pliki PDF, zdjęcia i podpisy do bucketu rycos-reports
       const optimized = await optimizeReportForStorage(report);
+      const pdfPath = storagePathFromRef(optimized.pdfDataUrl);
 
-      const { error } = await supabase.from("daily_reports").upsert(
-        {
-          id: optimized.id,
-          tenant_id: optimized.tenantId || "tenant-sb-tech-poznan",
-          report_type: optimized.reportType,
-          date: optimized.date,
-          time: optimized.time,
-          site_id: optimized.siteId,
-          site_name: optimized.siteName,
-          foreman_id: optimized.foremanId,
-          foreman_name: optimized.foremanName,
-          location: optimized.location || {},
-          discussed_topics: optimized.discussedTopics || [],
-          attendance_list: optimized.attendanceList || [],
-          photo_documentation: optimized.photoDocumentation || [],
-          pdf_file_name: optimized.pdfFileName,
-          pdf_data_url: optimized.pdfDataUrl,
-          sent_to_emails: optimized.sentToEmails || [],
-          sent_at: optimized.sentAt || new Date().toISOString(),
-          status: optimized.status || "SENT",
-        },
+      const { error } = await supabase.from(REPORTS_TABLE).upsert(
+        dailyReportToRow(optimized, {
+          pdfPath: pdfPath || "",
+          status: "FAILED",
+          sentToEmails: [],
+          errorMessage:
+            optimized.errorMessage ||
+            "Raport dosłany z urządzenia po utracie łączności — e-mail nie został wysłany.",
+          createdBy: auth.context.user.id,
+          createdByName: `${auth.context.user.firstName} ${auth.context.user.lastName}`.trim(),
+        }),
         { onConflict: "id" }
       );
 
@@ -228,7 +200,7 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: "Raport zapisany w bazie Supabase i przesłany do Storage Bucket",
+        message: "Raport dosłany z urządzenia. Wyślij go mailem z zakładki Archiwum.",
         optimizedReport: optimized,
       });
     }

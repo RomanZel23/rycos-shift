@@ -348,34 +348,14 @@ export default function Home() {
     }).catch(() => {});
   };
 
-  const handleReportCreated = async (newReport: DailyReport) => {
-    setReports((prev) => [newReport, ...prev]);
-    saveStoredReport(newReport);
-    try {
-      const res = await fetch("/api/db/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "SAVE_REPORT", report: newReport }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        // Potwierdzony zapis: oznacz raport i podmień ciężkie base64 na adresy
-        // /api/files, żeby lokalny cache nie rósł do rozmiaru całego PDF-a.
-        markStoredReportSynced(newReport.id, data.optimizedReport);
-        const light: DailyReport = {
-          ...newReport,
-          ...(data.optimizedReport || {}),
-          cloudSyncedAt: new Date().toISOString(),
-        };
-        setReports((prev) => prev.map((r) => (r.id === light.id ? light : r)));
-      } else {
-        console.warn("Zapis do bazy danych zwrócił błąd:", data.message);
-        bumpStoredReportAttempt(newReport.id);
-      }
-    } catch (err) {
-      console.warn("Błąd sieciowy podczas zapisu raportu do Supabase:", err);
-      bumpStoredReportAttempt(newReport.id);
-    }
+  /**
+   * Raport jest zapisywany i wysylany przez /api/reports jeszcze w formularzu,
+   * wiec tutaj zostaje wylacznie wstawienie gotowego wyniku do stanu i cache'u.
+   * Wczesniej ta funkcja robila drugi zapis do bazy.
+   */
+  const handleReportCreated = (report: DailyReport) => {
+    setReports((prev) => [report, ...prev.filter((r) => r.id !== report.id)]);
+    saveStoredReport(report);
   };
 
   // ETAP 0: URZĄDZENIE BEZ AUTORYZACJI -> EKRAN KODU DOSTĘPU PRZED LOGOWANIEM

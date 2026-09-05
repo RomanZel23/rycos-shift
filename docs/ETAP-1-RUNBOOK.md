@@ -35,14 +35,27 @@ Na końcu pliku są trzy zapytania weryfikacyjne — uruchom je po migracji.
 
 ## 2. Hasło startowe administratora
 
-Migracja wpisuje hash hasła dla konta `usr-admin-1` (Marcin Bajda / `m.bajda`):
+> **Wykorzystane i nieaktualne.** Hasło startowe zostało użyte przy wdrożeniu
+> 2026-09-05 i od razu zmienione, dlatego nie ma go w tym pliku — plaintextowe
+> poświadczenie nie ma czego szukać w repozytorium. Hash w migracji `0002` jest
+> już tylko zapisem historycznym.
 
-```
-Rycos-16F19034-9325
+Migracja wpisuje hash hasła dla konta `usr-admin-1` (`m.bajda`). To jedyne konto,
+które po migracji ma jakiekolwiek poświadczenia — od niego zaczyna się nadawanie
+haseł i PIN-ów reszcie zespołu.
+
+Gdybyś odtwarzał środowisko od zera, wygeneruj nowe hasło i jego hash:
+
+```bash
+node -e '
+const {randomBytes,scryptSync}=require("crypto");
+const pw=process.argv[1]; const salt=randomBytes(16);
+const h=scryptSync(pw.normalize("NFKC"),salt,32,{N:65536,r:8,p:1,maxmem:167772160});
+console.log(`scrypt$65536$8$1$${salt.toString("base64")}$${h.toString("base64")}`);
+' "TwojeNoweHaslo123"
 ```
 
-To jedyne konto, które po migracji ma jakiekolwiek poświadczenia. Zapisz je
-w menedżerze haseł i zmień po pierwszym zalogowaniu (Ustawienia → Poświadczenia).
+i podmień wartość w `update public.users set password_hash = ...`.
 
 ## 3. Zmienne środowiskowe
 

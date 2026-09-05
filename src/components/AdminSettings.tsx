@@ -80,7 +80,6 @@ export function AdminSettings({
   const [endEmails, setEndEmails] = useState(
     settings.endShiftEmailRecipients.join(", ")
   );
-  const [resendApiKey, setResendApiKey] = useState(settings.resendApiKey || "");
   const [resendFromEmail, setResendFromEmail] = useState(
     settings.resendFromEmail || "raporty@shift.rycos.eu"
   );
@@ -299,7 +298,6 @@ export function AdminSettings({
       logoText: logoText.trim() || settings.logoText,
       startShiftEmailRecipients: startList,
       endShiftEmailRecipients: endList,
-      resendApiKey: resendApiKey.trim(),
       resendFromEmail: resendFromEmail.trim() || "raporty@shift.rycos.eu",
     };
 
@@ -818,13 +816,12 @@ export function AdminSettings({
                 <label className="block text-sm font-extrabold text-slate-800 dark:text-slate-200 mb-1.5">
                   Klucz API Resend:
                 </label>
-                <input
-                  type="password"
-                  value={resendApiKey}
-                  onChange={(e) => setResendApiKey(e.target.value)}
-                  placeholder="re_xxxxxxxxxxxx"
-                  className="w-full h-12 px-4 bg-slate-50 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 rounded-2xl text-sm font-semibold font-mono"
-                />
+                <div className="p-3.5 bg-slate-100 dark:bg-slate-950/60 border-2 border-slate-200 dark:border-slate-800 rounded-2xl text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                  Konfigurowany wyłącznie po stronie serwera, w zmiennej
+                  środowiskowej <code className="font-mono text-slate-800 dark:text-slate-200">RESEND_API_KEY</code>.
+                  Wcześniej klucz leżał w pamięci przeglądarki każdego brygadzisty i był
+                  wysyłany razem z każdym raportem.
+                </div>
               </div>
             </div>
 

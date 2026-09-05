@@ -37,8 +37,10 @@ create unique index if not exists users_login_unique
 
 -- ---------------------------------------------------------------------------
 -- 2. Konto startowe administratora
---    Hash scrypt hasła podanego przy wdrożeniu (patrz docs/ETAP-1-RUNBOOK.md).
---    Zmień je po pierwszym zalogowaniu w Ustawieniach.
+--    Hash scrypt hasła startowego użytego przy wdrożeniu 2026-09-05.
+--    Hasło zostało zmienione zaraz po pierwszym zalogowaniu — ten hash jest
+--    już tylko zapisem historycznym migracji. Przy odtwarzaniu środowiska
+--    od zera wygeneruj nowy (instrukcja w docs/ETAP-1-RUNBOOK.md).
 -- ---------------------------------------------------------------------------
 update public.users
 set password_hash = 'scrypt$65536$8$1$I8yDqCsQgc2gpfz5BRzQfw==$KCXHJJtJRgYCzLFVMy9XfZ19FIp3V9RwFTnIbzh+n+c=',

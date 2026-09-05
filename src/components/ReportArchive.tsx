@@ -127,73 +127,30 @@ export function ReportArchive({
       setResendingId(report.id);
       setResendStatus(null);
 
-      // Zawsze wygeneruj najświeższy, idealnie sformatowany PDF w nowym układzie stron
-      const result = await generateReportPDFAsync(report, settings);
-      const pdfBase64 = result.dataUrl;
-      const fileName = result.fileName;
-
-      // 2. Zawsze używaj aktualnych odbiorców zdefiniowanych w Ustawieniach
-      const configuredRecipients =
-        report.reportType === "START_SHIFT"
-          ? settings?.startShiftEmailRecipients
-          : settings?.endShiftEmailRecipients;
-
-      const recipients =
-        configuredRecipients && configuredRecipients.length > 0
-          ? configuredRecipients
-          : report.sentToEmails &&
-            report.sentToEmails.length > 0 &&
-            !report.sentToEmails.some((e) => e.includes("raporty-start") || e.includes("kierownik.budowy"))
-          ? report.sentToEmails
-          : [];
-
-      if (recipients.length === 0) {
-        setResendStatus({
-          id: report.id,
-          success: false,
-          message: "Brak zdefiniowanych adresów e-mail odbiorców dla tego raportu w Ustawieniach.",
-        });
-        return;
-      }
-
-      // 3. Wyślij przez /api/send-report
-      const response = await fetch("/api/send-report", {
+      // Etap 2: wysyłamy wyłącznie identyfikator. Serwer bierze zarchiwizowany
+      // plik PDF z bucketu i aktualną listę odbiorców z bazy — klient nie ma
+      // już wpływu ani na treść załącznika, ani na to, kto go dostanie.
+      const response = await fetch("/api/reports/resend", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          pdfBase64,
-          fileName,
-          reportType: report.reportType,
-          siteName: report.siteName,
-          date: report.date,
-          time: report.time,
-          recipients,
-          apiKey: settings?.resendApiKey,
-          fromEmail: settings?.resendFromEmail || "raporty@shift.rycos.eu",
-          foremanName: report.foremanName,
-        }),
+        body: JSON.stringify({ reportId: report.id }),
+      });
+      const data = await response.json().catch(() => null);
+
+      setResendStatus({
+        id: report.id,
+        success: Boolean(data?.success),
+        message: data?.message || "Nie udało się ponowić wysyłki.",
       });
 
-      const resJson = await response.json();
-      if (resJson.success) {
-        setResendStatus({
-          id: report.id,
-          success: true,
-          message: `E-mail został pomyślnie wysłany na adresy: ${recipients.join(", ")}`,
-        });
-      } else {
-        setResendStatus({
-          id: report.id,
-          success: false,
-          message: resJson.message || "Błąd wysyłki wiadomości e-mail.",
-        });
+      if (data?.success && onRefresh) {
+        onRefresh();
       }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Wystąpił nieoczekiwany błąd podczas wysyłki";
+    } catch {
       setResendStatus({
         id: report.id,
         success: false,
-        message: msg,
+        message: "Brak połączenia z serwerem.",
       });
     } finally {
       setResendingId(null);

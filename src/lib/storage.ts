@@ -26,7 +26,6 @@ export const INITIAL_SETTINGS: TenantSettings = {
     "karolina.kaminska@kza.com.pl",
     "roman.zeleznik@solutionsbay.pl",
   ],
-  resendApiKey: "",
   resendFromEmail: "raporty@shift.rycos.eu",
   storageFolder: "Raporty_RYCOS_Shift_Poznan",
 };

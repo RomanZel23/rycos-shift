@@ -64,6 +64,8 @@ export function EndShiftForm({
   const [isAddingPhoto, setIsAddingPhoto] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Etap 2: gdy raport zapisał się, ale mail nie poszedł, mówimy to wprost.
+  const [emailWarning, setEmailWarning] = useState<string | null>(null);
   const [successReport, setSuccessReport] = useState<DailyReport | null>(null);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
 
@@ -176,7 +178,7 @@ export function EndShiftForm({
         ? `${selectedForeman.firstName} ${selectedForeman.lastName}`
         : "Brygadzista";
 
-      const reportData: DailyReport = {
+      let reportData: DailyReport = {
         id: "rep-end-" + Date.now(),
         tenantId: settings.tenantId,
         reportType: "END_SHIFT",
@@ -194,38 +196,47 @@ export function EndShiftForm({
         status: "SENT",
       };
 
-      // 1. Generowanie PDF za pomocą silnika HTML
+      // 1. Generowanie PDF
       const pdfResult = await generateReportPDFAsync(reportData, settings);
       reportData.pdfFileName = pdfResult.fileName;
-      reportData.pdfDataUrl = pdfResult.dataUrl;
 
-      try {
-        const response = await fetch("/api/send-report", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            pdfBase64: pdfResult.dataUrl,
-            fileName: pdfResult.fileName,
-            reportType: "END_SHIFT",
-            siteName,
-            date,
-            time,
-            recipients: settings.endShiftEmailRecipients,
-            apiKey: settings.resendApiKey,
-            fromEmail: settings.resendFromEmail,
-            foremanName,
-          }),
-        });
-        const resData = await response.json();
-        if (!resData.success) {
-          console.warn("Mail send notice:", resData.message);
-        }
-      } catch (mailErr) {
-        console.warn("Mail dispatch error:", mailErr);
+      // 2. Jedno żądanie: PDF jako binarny załącznik multipart + metadane.
+      // Serwer wrzuca plik do prywatnego bucketu, wysyła mail z własnej
+      // konfiguracji i zapisuje wiersz. Base64 nie jedzie już nigdzie.
+      const form = new FormData();
+      form.append("payload", JSON.stringify({ ...reportData, pdfDataUrl: undefined }));
+      form.append("pdf", pdfResult.blob, pdfResult.fileName);
+
+      const response = await fetch("/api/reports", { method: "POST", body: form });
+      const resData = await response.json().catch(() => null);
+
+      if (!response.ok || !resData?.success) {
+        // Zapis się nie udał — trzymamy raport lokalnie, żeby nie przepadł,
+        // i mówimy o tym wprost zamiast pokazywać ekran sukcesu.
+        const failed: DailyReport = {
+          ...reportData,
+          pdfDataUrl: pdfResult.dataUrl,
+          status: "FAILED",
+          errorMessage: resData?.message || "Nie udało się zapisać raportu na serwerze.",
+        };
+        saveStoredReport(failed);
+        if (onReportCreated) onReportCreated(failed);
+        setErrorBanner(
+          `${failed.errorMessage} Raport został zachowany na tym urządzeniu i zostanie dosłany przy następnej synchronizacji.`
+        );
+        return;
       }
 
-      saveStoredReport(reportData);
-      if (onReportCreated) onReportCreated(reportData);
+      const saved: DailyReport = {
+        ...(resData.report as DailyReport),
+        cloudSyncedAt: new Date().toISOString(),
+        syncAttempts: 0,
+      };
+
+      saveStoredReport(saved);
+      if (onReportCreated) onReportCreated(saved);
+      setEmailWarning(resData.emailSent ? null : resData.message || null);
+      reportData = saved;
 
       setSuccessReport(reportData);
     } catch (err: unknown) {
@@ -238,6 +249,7 @@ export function EndShiftForm({
 
   const resetForm = () => {
     setSuccessReport(null);
+    setEmailWarning(null);
     setPhotos([]);
     setDate(getPolishCurrentDate());
     setTime(getPolishCurrentTime());
@@ -246,28 +258,58 @@ export function EndShiftForm({
   const handleDownloadPDF = async () => {
     if (!successReport) return;
     const pdfResult = await generateReportPDFAsync(successReport, settings);
+    const url = URL.createObjectURL(pdfResult.blob);
     const link = document.createElement("a");
-    link.href = URL.createObjectURL(pdfResult.blob);
+    link.href = url;
     link.download = pdfResult.fileName;
     link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
   };
 
   return (
     <div className="w-full max-w-4xl mx-auto pb-32 md:pb-20">
       {successReport ? (
-        <div className="bg-white dark:bg-slate-900 border-2 border-indigo-500 rounded-3xl p-6 sm:p-10 shadow-2xl text-center space-y-6 animate-fade-in">
+        <div className={`bg-white dark:bg-slate-900 border-2 ${emailWarning ? "border-amber-500" : "border-indigo-500"} rounded-3xl p-6 sm:p-10 shadow-2xl text-center space-y-6 animate-fade-in`}>
           <div className="w-20 h-20 bg-indigo-100 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center justify-center mx-auto shadow-inner">
             <CheckCircle2 className="w-12 h-12" />
           </div>
           <div>
             <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">
-              Raport Zakończenia Prac Został Wysłany!
+              {emailWarning
+                ? "Raport Zakończenia Prac — zapisany, ale nie wysłany"
+                : "Raport Zakończenia Prac Został Wysłany!"}
             </h2>
             <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 mt-2 max-w-xl mx-auto font-medium">
-              Dokument PDF z fotorelacją <strong>{successReport.pdfFileName}</strong> został wygenerowany i przesłany do:
+              {emailWarning ? (
+                <>
+                  Dokument PDF z fotorelacją <strong>{successReport.pdfFileName}</strong> został
+                  zapisany w archiwum, ale wiadomość e-mail nie wyszła.
+                </>
+              ) : (
+                <>
+                  Dokument PDF z fotorelacją <strong>{successReport.pdfFileName}</strong> został
+                  wygenerowany i przesłany do:
+                </>
+              )}
             </p>
+
+            {emailWarning && (
+              <div className="mt-4 mx-auto max-w-xl p-4 bg-amber-50 dark:bg-amber-950/50 border-2 border-amber-400 dark:border-amber-700 rounded-2xl text-left space-y-2">
+                <div className="text-sm font-black text-amber-900 dark:text-amber-200">
+                  Wysyłka e-mail nie powiodła się
+                </div>
+                <p className="text-xs text-amber-900/90 dark:text-amber-200/90 leading-relaxed">
+                  {emailWarning}
+                </p>
+                <p className="text-xs text-amber-900/80 dark:text-amber-200/80 leading-relaxed">
+                  Raport jest bezpieczny w archiwum — możesz ponowić wysyłkę z zakładki Archiwum
+                  po usunięciu przyczyny.
+                </p>
+              </div>
+            )}
+
             <div className="mt-3 flex flex-wrap justify-center gap-2 max-w-lg mx-auto">
-              {successReport.sentToEmails.map((email, idx) => (
+              {(emailWarning ? [] : successReport.sentToEmails).map((email, idx) => (
                 <span
                   key={idx}
                   className="px-3.5 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs sm:text-sm rounded-xl font-mono font-bold border border-slate-300 dark:border-slate-700"

@@ -71,13 +71,15 @@ export interface DailyReport {
   pdfDataUrl?: string;
   sentToEmails: string[];
   sentAt: string;
-  status: 'SENT' | 'SAVED_LOCAL' | 'FAILED';
+  status: 'SENT' | 'EMAIL_FAILED' | 'SAVED_LOCAL' | 'FAILED';
   errorMessage?: string;
   // --- Pola wyłącznie lokalne (cache urządzenia). Nie mają kolumn w bazie
   // i są ignorowane przez mapowanie w /api/db/sync. Sterują kolejką offline:
   // dopóki cloudSyncedAt jest puste, raport jest uznawany za niedosłany.
   cloudSyncedAt?: string;
   syncAttempts?: number;
+  createdBy?: string;
+  createdByName?: string;
 }
 
 export interface TenantSettings {
@@ -87,7 +89,8 @@ export interface TenantSettings {
   logoSubtitle: string; // "RYCOS Shift"
   startShiftEmailRecipients: string[];
   endShiftEmailRecipients: string[];
-  resendApiKey?: string;
+  // Klucz Resend NIE jest już częścią ustawień aplikacji — od Etapu 2 żyje
+  // wyłącznie w zmiennej środowiskowej RESEND_API_KEY po stronie serwera.
   resendFromEmail?: string;
   storageFolder?: string;
 }
