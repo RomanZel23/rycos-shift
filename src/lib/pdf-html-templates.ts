@@ -92,11 +92,10 @@ function renderCorporateFooter(settings?: TenantSettings): string {
 /**
  * Skraca opis do budżetu znaków mieszczącego się w dwóch wierszach karty.
  *
- * Konieczne, bo html2canvas nie implementuje -webkit-line-clamp — na ekranie
- * opis wyglądał na przycięty do dwóch linii, a w PDF-ie renderował się w pełnej
- * wysokości i był siekany w połowie liter przez overflow rodzica.
+ * Karta ma ok. 322 px szerokości użytkowej, co przy 11 px pogrubionym daje
+ * ~52 znaki na wiersz. Bierzemy 100 z zapasem na szersze kroje.
  */
-function clampDescription(text: string, maxChars = 74): string {
+function clampDescription(text: string, maxChars = 100): string {
   const clean = (text || "").replace(/\s+/g, " ").trim();
   if (clean.length <= maxChars) return clean;
   const cut = clean.slice(0, maxChars);
@@ -104,24 +103,34 @@ function clampDescription(text: string, maxChars = 74): string {
   return (lastSpace > maxChars * 0.6 ? cut.slice(0, lastSpace) : cut).trimEnd() + "…";
 }
 
+/**
+ * Karta zdjęcia — pozycjonowanie bezwzględne zamiast flexboxa.
+ *
+ * Dwie wcześniejsze próby (line-clamp, potem policzone wysokości w flexie)
+ * wyglądały dobrze w Chromium na serwerze, a rozjeżdżały się na macOS, bo
+ * html2canvas rysuje tekst według metryk konkretnego kroju. -apple-system
+ * i Menlo są wyższe od zamienników linuksowych, więc linia „Wykonano" wypadała
+ * poza kartę i była przycinana.
+ *
+ * Rozwiązanie: godzina jest przyklejona do DOLNEJ krawędzi (bottom: 8px) i nie
+ * ma narzuconej wysokości. Cokolwiek zrobi krój, linia rośnie w górę w wolne
+ * miejsce i nie ma jak zostać ucięta. Opis ma okno 32 px (dwa wiersze po 16 px)
+ * z zapasem 14 px do godziny.
+ */
 function renderPhotoCard(photo: { photoDataUrl?: string; description?: string; takenAt?: string }, idx: number): string {
   const description = clampDescription(
     photo.description || "Dokumentacja stanu robót na placu budowy."
   );
   return `
-    <div style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; height: 265px; box-sizing: border-box;">
-      <div style="height: 195px; background-color: #0f172a; display: flex; align-items: center; justify-content: center; overflow: hidden;">
-        <img src="${photo.photoDataUrl || ""}" alt="Fotografia ${idx + 1}" style="width: 100%; height: 100%; object-fit: cover; display: block;" />
+    <div style="position: relative; background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden; height: 265px; box-sizing: border-box;">
+      <div style="position: absolute; top: 0; left: 0; right: 0; height: 185px; background-color: #0f172a; overflow: hidden;">
+        <img src="${photo.photoDataUrl || ""}" alt="Fotografia ${idx + 1}" style="width: 100%; height: 185px; object-fit: cover; display: block;" />
       </div>
-      <div style="padding: 8px 12px; height: 70px; box-sizing: border-box; background-color: #ffffff;">
-        <!-- Sztywne 30px = dokładnie dwa wiersze po 15px. html2canvas nie zna
-             line-clamp, więc wysokość musi być policzona, a nie sugerowana. -->
-        <div style="font-size: 11px; font-weight: 700; color: #1e293b; line-height: 15px; height: 30px; overflow: hidden; word-break: break-word;">
-          ${escapeHtml(description)}
-        </div>
-        <div style="font-size: 9px; color: #64748b; font-family: monospace; margin-top: 6px; line-height: 12px; height: 12px; overflow: hidden;">
-          Wykonano: ${formatPolishTime(photo.takenAt || "")}
-        </div>
+      <div style="position: absolute; top: 8px; left: 12px; right: 12px; margin-top: 185px; height: 32px; overflow: hidden; font-size: 11px; font-weight: 700; color: #1e293b; line-height: 16px; word-break: break-word;">
+        ${escapeHtml(description)}
+      </div>
+      <div style="position: absolute; left: 12px; right: 12px; bottom: 8px; font-size: 9px; line-height: 14px; color: #64748b; font-family: 'SF Mono', Menlo, Consolas, monospace;">
+        Wykonano: ${formatPolishTime(photo.takenAt || "")}
       </div>
     </div>
   `;
