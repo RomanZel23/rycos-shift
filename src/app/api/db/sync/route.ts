@@ -12,8 +12,27 @@ import {
 } from "@/types";
 import { optimizeReportForStorage } from "@/lib/supabase-storage";
 import { normalizeStoredFileRef } from "@/lib/storage-paths";
+import { forbidden, requireUser, withRefreshedSession } from "@/lib/auth";
 
-export async function GET() {
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+/** Akcje zmieniające konfigurację systemu — wyłącznie dla administratora. */
+const ADMIN_ONLY_ACTIONS = new Set([
+  "SYNC_USERS",
+  "DELETE_USER",
+  "SYNC_SITES",
+  "DELETE_SITE",
+  "SYNC_TOPICS",
+  "DELETE_TOPIC",
+  "SYNC_SETTINGS",
+  "SYNC_PDF_TEMPLATES",
+]);
+
+export async function GET(req: NextRequest) {
+  const auth = await requireUser(req);
+  if ("response" in auth) return auth.response;
+
   try {
     if (!isSupabaseConfigured()) {
       return NextResponse.json({
@@ -123,18 +142,21 @@ export async function GET() {
       updatedAt: row.updated_at,
     }));
 
-    return NextResponse.json({
-      success: true,
-      isConnected: true,
-      data: {
-        users: users.length > 0 ? users : null,
-        sites: sites.length > 0 ? sites : null,
-        topics: topics.length > 0 ? topics : null,
-        settings,
-        reports,
-        pdfTemplates,
-      },
-    });
+    return withRefreshedSession(
+      NextResponse.json({
+        success: true,
+        isConnected: true,
+        data: {
+          users: users.length > 0 ? users : null,
+          sites: sites.length > 0 ? sites : null,
+          topics: topics.length > 0 ? topics : null,
+          settings,
+          reports,
+          pdfTemplates,
+        },
+      }),
+      auth.context
+    );
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Błąd połączenia z Supabase";
     console.error("Supabase fetch error:", err);
@@ -143,6 +165,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = await requireUser(req);
+  if ("response" in auth) return auth.response;
+
   try {
     if (!isSupabaseConfigured()) {
       return NextResponse.json({
@@ -159,6 +184,13 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const { action, report, users, sites, topics, settings, pdfTemplates } = body;
+
+    // Zarządzanie użytkownikami, placami, tematami, ustawieniami i szablonami
+    // to operacje administracyjne. Zapis własnego raportu może zrobić każdy
+    // zalogowany pracownik.
+    if (ADMIN_ONLY_ACTIONS.has(action) && !auth.context.user.isAdmin) {
+      return forbidden();
+    }
 
     // 1. Zapis/Aktualizacja nowego raportu dziennego (z optymalizacją Storage Bucket)
     if (action === "SAVE_REPORT" && report) {

@@ -36,8 +36,6 @@ import {
   MAX_SYNC_ATTEMPTS,
   getStoredPdfTemplates,
   saveStoredPdfTemplates,
-  getStoredLoggedUser,
-  setStoredLoggedUser,
 } from "@/lib/storage";
 
 export default function Home() {
@@ -51,8 +49,11 @@ export default function Home() {
   const [reports, setReports] = useState<DailyReport[]>([]);
   const [pdfTemplates, setPdfTemplates] = useState<PdfTemplate[]>([]);
   
-  // Stan autentykacji / zalogowanego użytkownika
+  // Stan autentykacji. Źródłem prawdy jest ciasteczko sesji po stronie serwera —
+  // localStorage nie przechowuje już zalogowanego użytkownika, bo dało się go
+  // tam po prostu dopisać.
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isSessionChecked, setIsSessionChecked] = useState(false);
 
   // Stan synchronizacji z bazą Supabase
   const [isSyncing, setIsSyncing] = useState(false);
@@ -68,12 +69,16 @@ export default function Home() {
       setIsSyncing(true);
       const res = await fetch("/api/db/sync");
 
-      // Bramka Etapu 0 odrzuciła urządzenie — pokaż ekran kodu dostępu
+      // Bramka urządzenia albo wygasła sesja użytkownika
       if (res.status === 401 || res.status === 503) {
         const body = await res.json().catch(() => null);
         if (body?.code === "GATE_LOCKED" || body?.code === "GATE_NOT_CONFIGURED") {
           setIsGateLocked(true);
           setIsGateChecked(true);
+          return;
+        }
+        if (body?.code === "UNAUTHENTICATED") {
+          setCurrentUser(null);
           return;
         }
       }
@@ -93,14 +98,6 @@ export default function Home() {
         if (Array.isArray(dbUsers)) {
           setUsers(dbUsers);
           saveStoredUsers(dbUsers);
-          const loggedUser = getStoredLoggedUser();
-          if (loggedUser) {
-            const updatedCurrent = dbUsers.find((u: User) => u.id === loggedUser.id);
-            if (updatedCurrent) {
-              setCurrentUser(updatedCurrent);
-              setStoredLoggedUser(updatedCurrent);
-            }
-          }
         }
         if (Array.isArray(dbSites)) {
           setSites(dbSites);
@@ -226,8 +223,13 @@ export default function Home() {
 
   const handleGateUnlocked = useCallback(() => {
     setIsGateLocked(false);
-    syncWithDatabase();
-  }, [syncWithDatabase]);
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.user) setCurrentUser(data.user as User);
+      })
+      .catch(() => {});
+  }, []);
 
   // Inicjalizacja z localStorage i synchronizacja w tle przy starcie
   useEffect(() => {
@@ -242,7 +244,6 @@ export default function Home() {
       const loadedSettings = getStoredSettings();
       const loadedReports = getStoredReports();
       const loadedTemplates = getStoredPdfTemplates();
-      const loggedUser = getStoredLoggedUser();
 
       if (loadedUsers && loadedUsers.length > 0) setUsers(loadedUsers);
       if (loadedSites && loadedSites.length > 0) setSites(loadedSites);
@@ -250,34 +251,51 @@ export default function Home() {
       if (loadedSettings) setSettings(loadedSettings);
       if (loadedReports) setReports(loadedReports);
       if (loadedTemplates && loadedTemplates.length > 0) setPdfTemplates(loadedTemplates);
-      if (loggedUser) setCurrentUser(loggedUser);
     } catch (storageErr) {
       console.warn("Storage hydration notice:", storageErr);
     }
 
-    // 1. Natychmiastowa synchronizacja z bazą Supabase przy starcie aplikacji
-    syncWithDatabase();
-  }, [syncWithDatabase]);
+  }, []);
 
-  // Handlery logowania i wylogowania
+  // Kto jest zalogowany — pyta serwer, bo ciasteczko sesji jest httpOnly
+  // i przeglądarka nie umie go odczytać.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled && data?.user) setCurrentUser(data.user as User);
+      })
+      .catch(() => {
+        // offline — zostajemy przy ekranie logowania
+      })
+      .finally(() => {
+        if (!cancelled) setIsSessionChecked(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Dane z bazy pobieramy dopiero, gdy jest sesja — bez niej API i tak zwróci 401.
+  useEffect(() => {
+    if (currentUser) syncWithDatabase();
+  }, [currentUser, syncWithDatabase]);
+
+  // Handlery logowania i wylogowania. Sesję zakłada i kasuje serwer.
   const handleLogin = (user: User) => {
     setCurrentUser(user);
-    setStoredLoggedUser(user);
-    handleTabChange("START_SHIFT");
+    setActiveTab("START_SHIFT");
   };
 
-  const handleLogout = () => {
-    setCurrentUser(null);
-    setStoredLoggedUser(null);
-    handleTabChange("START_SHIFT");
-  };
-
-  const handleUserChange = (user: User) => {
-    setCurrentUser(user);
-    setStoredLoggedUser(user);
-    if (!user.isAdmin && activeTab === "SETTINGS") {
-      handleTabChange("START_SHIFT");
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      // brak sieci — i tak czyścimy stan lokalny
     }
+    setCurrentUser(null);
+    setActiveTab("START_SHIFT");
   };
 
   const handleUpdateUsers = (updated: User[]) => {
@@ -365,18 +383,21 @@ export default function Home() {
     return <AccessGate onUnlocked={handleGateUnlocked} />;
   }
 
+  // Zanim wiadomo, czy jest sesja, nie migaj ekranem logowania
+  if (!isSessionChecked) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   // JEŚLI UŻYTKOWNIK NIE JEST ZALOGOWANY -> POKAŻ OD RAZU EKRAN LOGOWANIA
   if (!currentUser) {
     return (
       <>
         <PwaInstallPrompt />
-        <LoginForm
-          users={users}
-          settings={settings}
-          onLogin={handleLogin}
-          onRefresh={syncWithDatabase}
-          isSyncing={isSyncing}
-        />
+        <LoginForm settings={settings} onLogin={handleLogin} />
       </>
     );
   }
@@ -391,8 +412,6 @@ export default function Home() {
         activeTab={activeTab}
         onTabChange={handleTabChange}
         currentUser={currentUser}
-        allUsers={users}
-        onUserChange={handleUserChange}
         onLogout={handleLogout}
         settings={settings}
         reportsCount={reports.length}

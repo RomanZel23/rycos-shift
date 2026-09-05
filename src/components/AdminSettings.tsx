@@ -63,7 +63,6 @@ export function AdminSettings({
     isForeman: false,
     isAdmin: false,
     login: "",
-    password: "",
   });
 
   // Stan nowego placu budowy
@@ -93,6 +92,74 @@ export function AdminSettings({
   const currentTemplate = pdfTemplates.find((t) => t.reportType === selectedTemplateType) || pdfTemplates[0];
   const [templateCode, setTemplateCode] = useState(currentTemplate?.htmlContent || "");
 
+  // Etap 1: nadawanie haseł i PIN-ów. Hasła nie przechodzą przez stan aplikacji
+  // dłużej niż trzeba i nigdy nie trafiają do localStorage — idą prosto do
+  // /api/users/credentials, gdzie serwer je hashuje.
+  const [credentialsFor, setCredentialsFor] = useState<User | null>(null);
+  const [credPassword, setCredPassword] = useState("");
+  const [credPin, setCredPin] = useState("");
+  const [credError, setCredError] = useState<string | null>(null);
+  const [credSaving, setCredSaving] = useState(false);
+
+  const closeCredentials = () => {
+    setCredentialsFor(null);
+    setCredPassword("");
+    setCredPin("");
+    setCredError(null);
+  };
+
+  const handleSaveCredentials = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!credentialsFor || credSaving) return;
+    if (!credPassword && !credPin) {
+      setCredError("Podaj hasło, PIN albo oba.");
+      return;
+    }
+    setCredSaving(true);
+    setCredError(null);
+    try {
+      const res = await fetch("/api/users/credentials", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: credentialsFor.id,
+          ...(credPassword ? { password: credPassword } : {}),
+          ...(credPin ? { pin: credPin } : {}),
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        const name = `${credentialsFor.firstName} ${credentialsFor.lastName}`;
+        closeCredentials();
+        triggerSaveBanner(`Poświadczenia dla ${name} zapisane. Stare sesje wygasły.`);
+      } else {
+        setCredError(data?.message || "Nie udało się zapisać poświadczeń.");
+      }
+    } catch {
+      setCredError("Brak połączenia z serwerem.");
+    } finally {
+      setCredSaving(false);
+    }
+  };
+
+  const handleUnlockAccount = async (user: User) => {
+    try {
+      const res = await fetch("/api/users/credentials", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id }),
+      });
+      const data = await res.json();
+      triggerSaveBanner(
+        data?.success
+          ? `Konto ${user.firstName} ${user.lastName} odblokowane.`
+          : data?.message || "Nie udało się odblokować konta."
+      );
+    } catch {
+      triggerSaveBanner("Brak połączenia z serwerem.");
+    }
+  };
+
   // Komunikat potwierdzenia zapisu
   const [saveBanner, setSaveBanner] = useState<string | null>(null);
 
@@ -116,7 +183,6 @@ export function AdminSettings({
       login:
         newUser.login.trim() ||
         `${newUser.firstName[0].toLowerCase()}.${newUser.lastName.toLowerCase()}`,
-      password: newUser.password || "password123",
       createdAt: new Date().toISOString(),
     };
 
@@ -129,9 +195,10 @@ export function AdminSettings({
       isForeman: false,
       isAdmin: false,
       login: "",
-      password: "",
     });
-    triggerSaveBanner("Użytkownik został pomyślnie dodany i zapisany w Supabase.");
+    triggerSaveBanner(
+      "Użytkownik dodany. Nadaj mu hasło lub PIN przyciskiem „Poświadczenia” — bez tego się nie zaloguje."
+    );
   };
 
   const handleDeleteUser = async (userId: string) => {
@@ -492,13 +559,36 @@ export function AdminSettings({
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteUser(u.id)}
-                    className="p-2 text-slate-400 hover:text-rose-600 rounded-xl hover:bg-rose-100 dark:hover:bg-rose-950/50 transition-colors"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCredentialsFor(u);
+                        setCredPassword("");
+                        setCredPin("");
+                        setCredError(null);
+                      }}
+                      title="Nadaj hasło lub PIN"
+                      className="px-3 py-2 text-xs font-black text-sky-700 dark:text-sky-300 bg-sky-100 dark:bg-sky-950/60 hover:bg-sky-200 dark:hover:bg-sky-900 rounded-xl transition-colors cursor-pointer"
+                    >
+                      Poświadczenia
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleUnlockAccount(u)}
+                      title="Odblokuj konto po nieudanych próbach logowania"
+                      className="px-3 py-2 text-xs font-black text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-colors cursor-pointer"
+                    >
+                      Odblokuj
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteUser(u.id)}
+                      className="p-2 text-slate-400 hover:text-rose-600 rounded-xl hover:bg-rose-100 dark:hover:bg-rose-950/50 transition-colors cursor-pointer"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -905,6 +995,85 @@ export function AdminSettings({
           </div>
         </div>
       )}
+
+      {/* MODAL: NADANIE HASŁA I PIN-U */}
+      {credentialsFor && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-950/70 backdrop-blur-sm p-0 sm:p-4">
+          <form
+            onSubmit={handleSaveCredentials}
+            className="w-full sm:max-w-md bg-white dark:bg-slate-900 border-t-2 sm:border-2 border-slate-200 dark:border-slate-800 rounded-t-3xl sm:rounded-3xl p-6 space-y-5 shadow-2xl"
+          >
+            <div>
+              <h3 className="text-lg font-black text-slate-900 dark:text-white">
+                Poświadczenia
+              </h3>
+              <p className="text-sm text-slate-500 font-semibold">
+                {credentialsFor.firstName} {credentialsFor.lastName}
+                {credentialsFor.login ? ` · ${credentialsFor.login}` : ""}
+              </p>
+            </div>
+
+            {credError && (
+              <div className="p-3 bg-rose-50 dark:bg-rose-950/60 border-2 border-rose-300 dark:border-rose-800 rounded-2xl text-rose-700 dark:text-rose-200 text-xs font-bold">
+                {credError}
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-black uppercase tracking-wider text-slate-500">
+                Hasło (tryb „Login i Hasło")
+              </label>
+              <input
+                type="text"
+                autoComplete="off"
+                value={credPassword}
+                onChange={(e) => setCredPassword(e.target.value)}
+                placeholder="min. 10 znaków, litery i cyfry"
+                className="w-full h-12 px-4 bg-slate-50 dark:bg-slate-950 border-2 border-slate-200 dark:border-slate-800 focus:border-sky-500 rounded-2xl text-sm font-semibold text-slate-900 dark:text-white outline-none"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-black uppercase tracking-wider text-slate-500">
+                PIN (tryb „Wybór Pracownika")
+              </label>
+              <input
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
+                value={credPin}
+                onChange={(e) => setCredPin(e.target.value)}
+                placeholder="4–8 cyfr"
+                className="w-full h-12 px-4 bg-slate-50 dark:bg-slate-950 border-2 border-slate-200 dark:border-slate-800 focus:border-sky-500 rounded-2xl text-sm font-semibold text-slate-900 dark:text-white outline-none tracking-widest"
+              />
+            </div>
+
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              Wartości są widoczne, żebyś mógł je przepisać pracownikowi — zapisz je teraz,
+              bo serwer przechowuje wyłącznie hash i nie da się ich później odczytać.
+              Zapis unieważnia wszystkie aktywne sesje tej osoby.
+            </p>
+
+            <div className="flex gap-2.5 pt-1">
+              <button
+                type="button"
+                onClick={closeCredentials}
+                className="flex-1 h-12 rounded-2xl border-2 border-slate-200 dark:border-slate-700 text-sm font-black text-slate-600 dark:text-slate-300 cursor-pointer"
+              >
+                Anuluj
+              </button>
+              <button
+                type="submit"
+                disabled={credSaving}
+                className="flex-1 h-12 rounded-2xl bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white text-sm font-black cursor-pointer"
+              >
+                {credSaving ? "Zapisywanie..." : "Zapisz"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
     </div>
   );
 }

@@ -8,7 +8,6 @@ export interface User {
   isForeman: boolean;
   isAdmin: boolean;
   login: string;
-  password?: string;
   createdAt: string;
 }
 

@@ -21,8 +21,6 @@ interface HeaderProps {
   activeTab: ActiveTab;
   onTabChange: (tab: ActiveTab) => void;
   currentUser: User;
-  allUsers: User[];
-  onUserChange: (user: User) => void;
   onLogout?: () => void;
   settings: TenantSettings;
   reportsCount: number;
@@ -32,8 +30,6 @@ export function Header({
   activeTab,
   onTabChange,
   currentUser,
-  allUsers,
-  onUserChange,
   onLogout,
   settings,
   reportsCount,

@@ -2,8 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { getSupabaseClient, isSupabaseConfigured } from "@/lib/supabase";
 import { sanitizePdfFileName } from "@/lib/pdf-generator";
+import { requireUser } from "@/lib/auth";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
+  // Etap 1: wysyłka tylko dla zalogowanych. Odbiorcy i klucz API nadal
+  // przychodzą z body — to zostaje uszczelnione w Etapie 2.
+  const auth = await requireUser(req);
+  if ("response" in auth) return auth.response;
+
   try {
     const body = await req.json();
     const {
