@@ -15,7 +15,6 @@ import {
   DiscussedTopicTemplate,
   TenantSettings,
   DailyReport,
-  PdfTemplate,
 } from "@/types";
 import {
   INITIAL_SETTINGS,
@@ -34,8 +33,6 @@ import {
   bumpStoredReportAttempt,
   ensureReportSyncSchema,
   MAX_SYNC_ATTEMPTS,
-  getStoredPdfTemplates,
-  saveStoredPdfTemplates,
 } from "@/lib/storage";
 
 export default function Home() {
@@ -47,7 +44,6 @@ export default function Home() {
   const [topics, setTopics] = useState<DiscussedTopicTemplate[]>([]);
   const [settings, setSettings] = useState<TenantSettings>(INITIAL_SETTINGS);
   const [reports, setReports] = useState<DailyReport[]>([]);
-  const [pdfTemplates, setPdfTemplates] = useState<PdfTemplate[]>([]);
   
   // Stan autentykacji. Źródłem prawdy jest ciasteczko sesji po stronie serwera —
   // localStorage nie przechowuje już zalogowanego użytkownika, bo dało się go
@@ -92,7 +88,6 @@ export default function Home() {
           topics: dbTopics,
           settings: dbSettings,
           reports: dbReports,
-          pdfTemplates: dbTemplates,
         } = resJson.data;
 
         if (Array.isArray(dbUsers)) {
@@ -177,10 +172,6 @@ export default function Home() {
           setReports(mergedReports);
           saveStoredReports(mergedReports);
         }
-        if (Array.isArray(dbTemplates)) {
-          setPdfTemplates(dbTemplates);
-          saveStoredPdfTemplates(dbTemplates);
-        }
       } else {
         setIsSupabaseConnected(resJson.isConnected ?? false);
       }
@@ -243,14 +234,12 @@ export default function Home() {
       const loadedTopics = getStoredTopics();
       const loadedSettings = getStoredSettings();
       const loadedReports = getStoredReports();
-      const loadedTemplates = getStoredPdfTemplates();
 
       if (loadedUsers && loadedUsers.length > 0) setUsers(loadedUsers);
       if (loadedSites && loadedSites.length > 0) setSites(loadedSites);
       if (loadedTopics && loadedTopics.length > 0) setTopics(loadedTopics);
       if (loadedSettings) setSettings(loadedSettings);
       if (loadedReports) setReports(loadedReports);
-      if (loadedTemplates && loadedTemplates.length > 0) setPdfTemplates(loadedTemplates);
     } catch (storageErr) {
       console.warn("Storage hydration notice:", storageErr);
     }
@@ -338,15 +327,6 @@ export default function Home() {
     }).catch(() => {});
   };
 
-  const handleUpdatePdfTemplates = (updated: PdfTemplate[]) => {
-    setPdfTemplates(updated);
-    saveStoredPdfTemplates(updated);
-    fetch("/api/db/sync", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "SYNC_PDF_TEMPLATES", pdfTemplates: updated }),
-    }).catch(() => {});
-  };
 
   /**
    * Raport jest zapisywany i wysylany przez /api/reports jeszcze w formularzu,
@@ -438,12 +418,10 @@ export default function Home() {
             sites={sites}
             topicTemplates={topics}
             settings={settings}
-            pdfTemplates={pdfTemplates}
             onUpdateUsers={handleUpdateUsers}
             onUpdateSites={handleUpdateSites}
             onUpdateTopics={handleUpdateTopics}
             onUpdateSettings={handleUpdateSettings}
-            onUpdatePdfTemplates={handleUpdatePdfTemplates}
           />
         )}
       </main>

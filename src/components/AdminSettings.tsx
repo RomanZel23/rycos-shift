@@ -14,7 +14,6 @@ import {
   Key,
   Layers,
   Save,
-  FileCode,
   RotateCcw,
   Sparkles,
 } from "lucide-react";
@@ -23,7 +22,6 @@ import {
   ConstructionSite,
   DiscussedTopicTemplate,
   TenantSettings,
-  PdfTemplate,
 } from "@/types";
 
 interface AdminSettingsProps {
@@ -31,12 +29,10 @@ interface AdminSettingsProps {
   sites: ConstructionSite[];
   topicTemplates: DiscussedTopicTemplate[];
   settings: TenantSettings;
-  pdfTemplates?: PdfTemplate[];
   onUpdateUsers: (users: User[]) => void;
   onUpdateSites: (sites: ConstructionSite[]) => void;
   onUpdateTopics: (topics: DiscussedTopicTemplate[]) => void;
   onUpdateSettings: (settings: TenantSettings) => void;
-  onUpdatePdfTemplates?: (templates: PdfTemplate[]) => void;
 }
 
 export function AdminSettings({
@@ -44,15 +40,13 @@ export function AdminSettings({
   sites,
   topicTemplates,
   settings,
-  pdfTemplates = [],
   onUpdateUsers,
   onUpdateSites,
   onUpdateTopics,
   onUpdateSettings,
-  onUpdatePdfTemplates,
 }: AdminSettingsProps) {
   const [activeSubTab, setActiveSubTab] = useState<
-    "users" | "sites" | "topics" | "emails" | "tenant" | "templates"
+    "users" | "sites" | "topics" | "emails" | "tenant"
   >("users");
 
   // Stan nowego użytkownika
@@ -86,10 +80,11 @@ export function AdminSettings({
   const [orgName, setOrgName] = useState(settings.organizationName);
   const [logoText, setLogoText] = useState(settings.logoText);
 
-  // Stan edytora szablonów PDF
-  const [selectedTemplateType, setSelectedTemplateType] = useState<"START_SHIFT" | "END_SHIFT">("START_SHIFT");
-  const currentTemplate = pdfTemplates.find((t) => t.reportType === selectedTemplateType) || pdfTemplates[0];
-  const [templateCode, setTemplateCode] = useState(currentTemplate?.htmlContent || "");
+  // Etap 3: edytor szablonów PDF usunięty. Zapisywał html_content do bazy,
+  // ale generator nigdy z niego nie korzystał — administrator edytował szablon,
+  // który nie miał wpływu na żaden dokument. Wygląd raportów definiuje teraz
+  // src/lib/pdf-html-templates.ts, a zmiany idą przez wdrożenie.
+  // Tabela pdf_templates zostaje w bazie na wypadek powrotu funkcji.
 
   // Etap 1: nadawanie haseł i PIN-ów. Hasła nie przechodzą przez stan aplikacji
   // dłużej niż trzeba i nigdy nie trafiają do localStorage — idą prosto do
@@ -306,22 +301,6 @@ export function AdminSettings({
   };
 
   // --- ZAPIS SZABLONU PDF ---
-  const handleSaveTemplate = () => {
-    if (!onUpdatePdfTemplates) return;
-    const updated = pdfTemplates.map((t) => {
-      if (t.reportType === selectedTemplateType) {
-        return {
-          ...t,
-          htmlContent: templateCode,
-          updatedAt: new Date().toISOString(),
-        };
-      }
-      return t;
-    });
-
-    onUpdatePdfTemplates(updated);
-    triggerSaveBanner("Szablon raportu PDF (HTML) został zapisany w bazie danych Supabase!");
-  };
 
   return (
     <div className="w-full max-w-5xl mx-auto space-y-6 pb-32 md:pb-20">
@@ -402,18 +381,6 @@ export function AdminSettings({
           <span>Listy Mailingowe & Resend</span>
         </button>
 
-        <button
-          type="button"
-          onClick={() => setActiveSubTab("templates")}
-          className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
-            activeSubTab === "templates"
-              ? "bg-sky-600 text-white shadow-md shadow-sky-600/30 font-black"
-              : "bg-white dark:bg-slate-900 text-sky-700 dark:text-sky-300 hover:bg-sky-50 border border-sky-200 dark:border-sky-800"
-          }`}
-        >
-          <FileCode className="w-4 h-4" />
-          <span>Szablony PDF (HTML Baza)</span>
-        </button>
 
         <button
           type="button"
@@ -840,101 +807,6 @@ export function AdminSettings({
       )}
 
       {/* 5. ZAKŁADKA SZABLONÓW PDF (HTML BAZA) */}
-      {activeSubTab === "templates" && (
-        <div className="bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
-            <div>
-              <h3 className="text-base sm:text-lg font-black uppercase text-slate-900 dark:text-white flex items-center gap-2">
-                <FileCode className="w-5 h-5 text-sky-600" />
-                <span>Szablony PDF (HTML w bazie danych Supabase)</span>
-              </h3>
-              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-                Szablony HTML generowane są w 100% z kodowaniem UTF-8, obsługując dowolne logo, kolory i układ tabeli.
-              </p>
-            </div>
-
-            {/* PRZEŁĄCZNIK TYPU SZABLONU */}
-            <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl">
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedTemplateType("START_SHIFT");
-                  const tpl = pdfTemplates.find((t) => t.reportType === "START_SHIFT");
-                  if (tpl) setTemplateCode(tpl.htmlContent);
-                }}
-                className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                  selectedTemplateType === "START_SHIFT"
-                    ? "bg-sky-600 text-white shadow-md"
-                    : "text-slate-600 dark:text-slate-400"
-                }`}
-              >
-                Rozpoczęcie prac
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedTemplateType("END_SHIFT");
-                  const tpl = pdfTemplates.find((t) => t.reportType === "END_SHIFT");
-                  if (tpl) setTemplateCode(tpl.htmlContent);
-                }}
-                className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                  selectedTemplateType === "END_SHIFT"
-                    ? "bg-indigo-600 text-white shadow-md"
-                    : "text-slate-600 dark:text-slate-400"
-                }`}
-              >
-                Zakończenie prac
-              </button>
-            </div>
-          </div>
-
-          {/* INFORMACJA O ZAPISIE W BAZIE */}
-          <div className="p-4 bg-sky-50 dark:bg-sky-950/60 border-2 border-sky-200 dark:border-sky-800 rounded-2xl text-xs sm:text-sm text-sky-900 dark:text-sky-200 font-semibold space-y-1">
-            <div className="flex items-center gap-2 font-black text-sky-800 dark:text-sky-300">
-              <Sparkles className="w-4 h-4 text-sky-500" />
-              <span>Tabela: public.pdf_templates (Supabase PostgreSQL)</span>
-            </div>
-            <div>
-              Edytujesz aktywny szablon: <strong>{currentTemplate?.name || selectedTemplateType}</strong>.
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-extrabold text-slate-800 dark:text-slate-200 mb-2">
-              Kod źródłowy szablonu HTML / CSS:
-            </label>
-            <textarea
-              rows={12}
-              value={templateCode}
-              onChange={(e) => setTemplateCode(e.target.value)}
-              className="w-full p-4 bg-slate-950 text-sky-300 font-mono text-xs sm:text-sm rounded-2xl border-2 border-slate-800 focus:ring-4 focus:ring-sky-500/20 focus:border-sky-500 focus:outline-none leading-relaxed"
-            />
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-            <button
-              type="button"
-              onClick={() => {
-                const def = pdfTemplates.find((t) => t.reportType === selectedTemplateType);
-                if (def) setTemplateCode(def.htmlContent);
-              }}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold cursor-pointer"
-            >
-              <RotateCcw className="w-4 h-4" />
-              <span>Przywróć domyślny kod HTML</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleSaveTemplate}
-              className="flex items-center gap-2 px-8 py-3.5 bg-sky-600 hover:bg-sky-500 text-white rounded-2xl font-black text-sm shadow-md cursor-pointer active:scale-95 transition-all"
-            >
-              <Save className="w-4 h-4" />
-              <span>Zapisz szablon HTML w bazie Supabase</span>
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* 6. ZAKŁADKA INSTANCJI & BRANDINGU */}
       {activeSubTab === "tenant" && (

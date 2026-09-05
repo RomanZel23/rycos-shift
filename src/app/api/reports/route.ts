@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseClient, isSupabaseConfigured } from "@/lib/supabase";
 import { requireUser, withRefreshedSession } from "@/lib/auth";
 import { optimizeReportForStorage } from "@/lib/supabase-storage";
-import { toAppFileUrl } from "@/lib/storage-paths";
+import { BUCKET_NAME, storagePathFromRef, toAppFileUrl } from "@/lib/storage-paths";
+import { generateEndShiftHtml, generateStartShiftHtml } from "@/lib/pdf-html-templates";
+import { renderHtmlToPdf } from "@/lib/pdf-renderer";
+import { loadLogoDataUrl, mediaAsDataUrls } from "@/lib/pdf-assets";
 import { resolveEmailConfig, sendReportEmail } from "@/lib/email";
 import { sanitizePdfFileName } from "@/lib/pdf-generator";
 import { DailyReport } from "@/types";
@@ -11,15 +14,14 @@ import { REPORTS_TABLE, dailyReportToRow } from "@/lib/report-mapper";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const MAX_PDF_BYTES = 25 * 1024 * 1024;
-
 /**
  * Etap 2 — jedyna droga zapisu raportu.
  *
  * Zmiany względem starego przepływu (/api/send-report + /api/db/sync):
- *   - PDF przychodzi jako binarny part multipart, a nie base64 data URL.
- *     Poprzednio ten sam plik jechał trzy razy: mailem, do localStorage i do
- *     bazy, rozbijając limit ciała żądania i limit localStorage.
+ *   - PDF nie przychodzi w ogóle — generuje go Chromium na serwerze (Etap 3).
+ *     Wcześniej ten sam plik jechał trzy razy: mailem, do localStorage i do
+ *     bazy, rozbijając limit ciała żądania i limit localStorage. Telefon
+ *     w terenie przestaje renderować dokument.
  *   - Odbiorcy, nadawca i klucz Resend pochodzą wyłącznie z serwera.
  *   - Status jest prawdziwy: nieudana wysyłka daje EMAIL_FAILED, a nie „SENT".
  */
@@ -41,32 +43,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let form: FormData;
-  try {
-    form = await req.formData();
-  } catch {
-    return NextResponse.json(
-      { success: false, message: "Nieprawidłowe żądanie (oczekiwano multipart/form-data)." },
-      { status: 400 }
-    );
-  }
-
-  const rawPayload = form.get("payload");
-  const pdfPart = form.get("pdf");
-
-  if (typeof rawPayload !== "string") {
-    return NextResponse.json(
-      { success: false, message: "Brak danych raportu." },
-      { status: 400 }
-    );
-  }
-
   let report: DailyReport;
   try {
-    report = JSON.parse(rawPayload);
+    const body = await req.json();
+    report = body?.report;
   } catch {
     return NextResponse.json(
-      { success: false, message: "Nieprawidłowy format danych raportu." },
+      { success: false, message: "Nieprawidłowy format żądania." },
       { status: 400 }
     );
   }
@@ -84,37 +67,55 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (!(pdfPart instanceof Blob)) {
-    return NextResponse.json(
-      { success: false, message: "Brak pliku PDF raportu." },
-      { status: 400 }
-    );
-  }
-  if (pdfPart.size > MAX_PDF_BYTES) {
-    return NextResponse.json(
-      {
-        success: false,
-        message: `Plik PDF jest za duży (${Math.round(pdfPart.size / 1024 / 1024)} MB, limit ${
-          MAX_PDF_BYTES / 1024 / 1024
-        } MB).`,
-      },
-      { status: 413 }
-    );
-  }
-
-  const pdfBuffer = Buffer.from(await pdfPart.arrayBuffer());
-
   // Autor raportu bierze się z sesji, nie z żądania.
   const authorId = auth.context.user.id;
   const authorName = `${auth.context.user.firstName} ${auth.context.user.lastName}`.trim();
 
-  // 1. PDF do prywatnego bucketu
   const dateStr = (report.date || "").replace(/[^0-9-]/g, "");
   const siteSlug = (report.siteName || "plac").replace(/[^a-zA-Z0-9_-]/g, "_");
-  const pdfPath = `pdf/${dateStr}_${report.reportType}_${siteSlug}_${report.id}.pdf`;
 
+  // 1. Podpisy i zdjęcia do prywatnego bucketu (przychodzą jako base64)
+  const optimized = await optimizeReportForStorage({ ...report, pdfDataUrl: undefined });
+  optimized.pdfFileName =
+    report.pdfFileName ||
+    sanitizePdfFileName(
+      `${report.date}_${
+        report.reportType === "START_SHIFT"
+          ? "Rozpoczecie_prac_zespolu"
+          : "Zakonczenie_prac_zespolu"
+      }_${siteSlug}`
+    );
+
+  // 2. Render dokumentu przez Chromium.
+  // Obrazy muszą być wstawione jako data URL — renderer nie ma dostępu do sieci.
+  let pdfBuffer: Buffer;
+  try {
+    const [forRender, logoDataUrl] = await Promise.all([
+      mediaAsDataUrls(optimized),
+      loadLogoDataUrl(),
+    ]);
+    const html =
+      report.reportType === "START_SHIFT"
+        ? generateStartShiftHtml(forRender, undefined, { logoDataUrl })
+        : generateEndShiftHtml(forRender, undefined, { logoDataUrl });
+
+    pdfBuffer = await renderHtmlToPdf(html, {
+      documentName: `${
+        report.reportType === "START_SHIFT" ? "Rozpoczęcie prac" : "Zakończenie prac"
+      } — ${report.siteName} — ${report.date}`,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "nieznany błąd";
+    console.error("PDF render error:", err);
+    return NextResponse.json(
+      { success: false, message: `Nie udało się wygenerować dokumentu PDF: ${message}` },
+      { status: 500 }
+    );
+  }
+
+  const pdfPath = `pdf/${dateStr}_${report.reportType}_${siteSlug}_${report.id}.pdf`;
   const { error: uploadError } = await supabase.storage
-    .from("rycos-reports")
+    .from(BUCKET_NAME)
     .upload(pdfPath, new Uint8Array(pdfBuffer), {
       contentType: "application/pdf",
       upsert: true,
@@ -127,14 +128,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 2. Podpisy i zdjęcia (nadal base64 w payloadzie) też lądują w buckecie
-  const optimized = await optimizeReportForStorage({
-    ...report,
-    pdfDataUrl: undefined,
-  });
   optimized.pdfDataUrl = toAppFileUrl(pdfPath);
-  optimized.pdfFileName =
-    report.pdfFileName || sanitizePdfFileName(`${report.date}_${report.reportType}_${siteSlug}`);
 
   // 3. Wysyłka — konfiguracja wyłącznie z serwera
   const config = await resolveEmailConfig(supabase, report.reportType);

@@ -22,7 +22,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { DailyReport, TenantSettings } from "@/types";
-import { generateReportPDFAsync, sanitizePdfFileName } from "@/lib/pdf-generator";
+import { sanitizePdfFileName } from "@/lib/pdf-generator";
 import { formatPolishTime } from "@/lib/date-utils";
 
 interface ReportArchiveProps {
@@ -107,18 +107,38 @@ export function ReportArchive({
     return matchesType && matchesSearch;
   });
 
+  /**
+   * Etap 3: pobieramy ZARCHIWIZOWANY plik, a nie generujemy nowego.
+   *
+   * Wcześniej każde kliknięcie „Pobierz" tworzyło dokument od nowa z danych
+   * raportu. Dla protokołu z podpisami to problem dowodowy — pobrany PDF mógł
+   * różnić się od tego, który poszedł mailem i został podpisany w terenie.
+   */
   const handleDownload = async (report: DailyReport) => {
+    if (!report.pdfDataUrl) {
+      setResendStatus({
+        id: report.id,
+        success: false,
+        message: "Ten raport nie ma zarchiwizowanego pliku PDF.",
+      });
+      return;
+    }
     try {
-      const result = await generateReportPDFAsync(report, settings);
+      const res = await fetch(report.pdfDataUrl);
+      if (!res.ok) throw new Error(String(res.status));
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
-      link.href = URL.createObjectURL(result.blob);
-      link.download = result.fileName;
+      link.href = url;
+      link.download = sanitizePdfFileName(report.pdfFileName || `raport_${report.date}`);
       link.click();
-    } catch (err) {
-      console.warn("Dynamic PDF generation fallback:", err);
-      if (report.pdfDataUrl && report.pdfDataUrl.startsWith("http")) {
-        window.open(report.pdfDataUrl, "_blank");
-      }
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch {
+      setResendStatus({
+        id: report.id,
+        success: false,
+        message: "Nie udało się pobrać dokumentu z archiwum.",
+      });
     }
   };
 

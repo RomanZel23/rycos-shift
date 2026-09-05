@@ -26,7 +26,6 @@ import {
 } from "@/types";
 import { GeoLocationBadge } from "./GeoLocationBadge";
 import { VoiceInputButton } from "./VoiceInputButton";
-import { generateReportPDFAsync } from "@/lib/pdf-generator";
 import { saveStoredReport } from "@/lib/storage";
 import { getPolishCurrentDate, getPolishCurrentTime } from "@/lib/date-utils";
 
@@ -196,18 +195,13 @@ export function EndShiftForm({
         status: "SENT",
       };
 
-      // 1. Generowanie PDF
-      const pdfResult = await generateReportPDFAsync(reportData, settings);
-      reportData.pdfFileName = pdfResult.fileName;
-
-      // 2. Jedno żądanie: PDF jako binarny załącznik multipart + metadane.
-      // Serwer wrzuca plik do prywatnego bucketu, wysyła mail z własnej
-      // konfiguracji i zapisuje wiersz. Base64 nie jedzie już nigdzie.
-      const form = new FormData();
-      form.append("payload", JSON.stringify({ ...reportData, pdfDataUrl: undefined }));
-      form.append("pdf", pdfResult.blob, pdfResult.fileName);
-
-      const response = await fetch("/api/reports", { method: "POST", body: form });
+      // Etap 3: dokument PDF generuje Chromium na serwerze. Telefon wysyła
+      // wyłącznie dane raportu — nie renderuje już nic i nie dźwiga base64.
+      const response = await fetch("/api/reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ report: reportData }),
+      });
       const resData = await response.json().catch(() => null);
 
       if (!response.ok || !resData?.success) {
@@ -215,7 +209,6 @@ export function EndShiftForm({
         // i mówimy o tym wprost zamiast pokazywać ekran sukcesu.
         const failed: DailyReport = {
           ...reportData,
-          pdfDataUrl: pdfResult.dataUrl,
           status: "FAILED",
           errorMessage: resData?.message || "Nie udało się zapisać raportu na serwerze.",
         };
@@ -256,14 +249,22 @@ export function EndShiftForm({
   };
 
   const handleDownloadPDF = async () => {
-    if (!successReport) return;
-    const pdfResult = await generateReportPDFAsync(successReport, settings);
-    const url = URL.createObjectURL(pdfResult.blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = pdfResult.fileName;
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    if (!successReport?.pdfDataUrl) return;
+    // Pobieramy dokładnie ten plik, który trafił do archiwum i poszedł mailem,
+    // zamiast generować nową wersję dokumentu.
+    try {
+      const res = await fetch(successReport.pdfDataUrl);
+      if (!res.ok) throw new Error("nie udało się pobrać pliku");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = successReport.pdfFileName || "raport.pdf";
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch {
+      setErrorBanner("Nie udało się pobrać dokumentu PDF z archiwum.");
+    }
   };
 
   return (
