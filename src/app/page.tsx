@@ -29,6 +29,7 @@ import {
   getStoredReports,
   saveStoredReport,
   saveStoredReports,
+  removeStoredReport,
   markStoredReportSynced,
   bumpStoredReportAttempt,
   ensureReportSyncSchema,
@@ -184,6 +185,39 @@ export default function Home() {
   }, []);
 
   // Przełączanie aktywnej zakładki
+  /**
+   * Usunięcie raportu z archiwum (tylko administrator — serwer i tak sprawdza
+   * uprawnienie osobno). Po skasowaniu wiersza zdejmujemy raport z widoku
+   * i z lokalnej kopii. Bez tego drugiego kroku wpis wróciłby przy najbliższym
+   * odświeżeniu — urządzenie uznałoby go za niedosłany i wysłało ponownie.
+   */
+  const handleDeleteReport = useCallback(
+    async (reportId: string): Promise<{ ok: boolean; message: string }> => {
+      try {
+        const res = await fetch("/api/reports/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reportId }),
+        });
+        const data = await res.json().catch(() => null);
+
+        if (!res.ok || !data?.success) {
+          return {
+            ok: false,
+            message: data?.message || "Nie udało się usunąć raportu.",
+          };
+        }
+
+        removeStoredReport(reportId);
+        setReports((prev) => prev.filter((r) => r.id !== reportId));
+        return { ok: true, message: data.message || "Raport usunięty." };
+      } catch {
+        return { ok: false, message: "Brak połączenia z serwerem." };
+      }
+    },
+    []
+  );
+
   const handleTabChange = useCallback((newTab: ActiveTab) => {
     setActiveTab(newTab);
     // Gdy użytkownik wchodzi do Archiwum, natychmiast odśwież z bazy Supabase
@@ -409,6 +443,8 @@ export default function Home() {
             onRefresh={syncWithDatabase}
             isSyncing={isSyncing}
             isSupabaseConnected={isSupabaseConnected}
+            canDelete={currentUser.isAdmin}
+            onDeleteReport={handleDeleteReport}
           />
         )}
 

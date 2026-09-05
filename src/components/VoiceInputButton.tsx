@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Mic, MicOff, Volume2 } from "lucide-react";
+import { finalTranscriptFrom, SpeechResultEvent } from "@/lib/speech";
 
 interface VoiceInputButtonProps {
   onTranscript: (text: string) => void;
@@ -9,26 +10,28 @@ interface VoiceInputButtonProps {
   placeholderText?: string;
 }
 
-interface SpeechRecognitionEvent extends Event {
-  results: {
-    [index: number]: {
-      [index: number]: {
-        transcript: string;
-      };
-    };
-    length: number;
-  };
-}
-
 interface SpeechRecognitionInstance extends EventTarget {
   continuous: boolean;
   interimResults: boolean;
+  maxAlternatives: number;
   lang: string;
   start: () => void;
   stop: () => void;
-  onresult: (event: SpeechRecognitionEvent) => void;
-  onerror: (event: Event) => void;
-  onend: () => void;
+  abort: () => void;
+  onresult: ((event: SpeechResultEvent) => void) | null;
+  onerror: ((event: Event) => void) | null;
+  onend: (() => void) | null;
+}
+
+type SpeechRecognitionCtor = new () => SpeechRecognitionInstance;
+
+function getRecognitionCtor(): SpeechRecognitionCtor | null {
+  if (typeof window === "undefined") return null;
+  const w = window as unknown as {
+    SpeechRecognition?: SpeechRecognitionCtor;
+    webkitSpeechRecognition?: SpeechRecognitionCtor;
+  };
+  return w.SpeechRecognition || w.webkitSpeechRecognition || null;
 }
 
 export function VoiceInputButton({
@@ -37,69 +40,93 @@ export function VoiceInputButton({
   placeholderText = "Mów teraz...",
 }: VoiceInputButtonProps) {
   const [isListening, setIsListening] = useState(false);
-  const [supported, setSupported] = useState(true);
+  // Brak obsługi mowy poznajemy po pustym refie — osobny stan był zbędny
+  // (widok go nie używał), a jego ustawianie w efekcie łamie regułę
+  // react-hooks/set-state-in-effect i przy React Compiler bywa pomijane.
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
 
+  // Wywołanie zwrotne trzymamy w refie, żeby móc zbudować obiekt rozpoznawania
+  // DOKŁADNIE RAZ. Wcześniej efekt zależał od `onTranscript`, a rodzic
+  // przekazuje tu funkcję strzałkową tworzoną przy każdym renderze — więc przy
+  // każdym wpisanym znaku powstawał nowy obiekt rozpoznawania. Ten w refie
+  // przestawał być tym, który faktycznie nasłuchuje, i przycisk „Zatrzymaj"
+  // zatrzymywał nie to, co trzeba.
+  const onTranscriptRef = useRef(onTranscript);
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const SpeechRecognition =
-        (window as unknown as { SpeechRecognition?: new () => SpeechRecognitionInstance }).SpeechRecognition ||
-        (window as unknown as { webkitSpeechRecognition?: new () => SpeechRecognitionInstance }).webkitSpeechRecognition;
-
-      if (SpeechRecognition) {
-        const recognition = new SpeechRecognition();
-        recognition.continuous = false;
-        recognition.interimResults = false;
-        recognition.lang = "pl-PL";
-
-        recognition.onresult = (event: SpeechRecognitionEvent) => {
-          if (event.results.length > 0) {
-            const transcript = event.results[0][0].transcript;
-            if (transcript) {
-              onTranscript(transcript.trim());
-            }
-          }
-          setIsListening(false);
-        };
-
-        recognition.onerror = () => {
-          setIsListening(false);
-        };
-
-        recognition.onend = () => {
-          setIsListening(false);
-        };
-
-        recognitionRef.current = recognition;
-      } else {
-        setSupported(false);
-      }
-    }
+    onTranscriptRef.current = onTranscript;
   }, [onTranscript]);
 
-  const toggleListening = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+  useEffect(() => {
+    const Ctor = getRecognitionCtor();
+    if (!Ctor) return;
 
-    if (!supported) {
-      const text = prompt("Wprowadzanie głosowe nie jest wspierane w tej przeglądarce. Wpisz tekst:");
-      if (text) onTranscript(text.trim());
-      return;
-    }
+    const recognition = new Ctor();
+    recognition.continuous = false;
+    // Wyniki tymczasowe są nam niepotrzebne, a to one powodowały doklejanie
+    // kolejnych wersji tej samej frazy. Filtr `isFinal` w finalTranscriptFrom
+    // broni nas i wtedy, gdy przeglądarka przyśle je mimo tego ustawienia.
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognition.lang = "pl-PL";
 
-    if (isListening) {
-      recognitionRef.current?.stop();
-      setIsListening(false);
-    } else {
+    recognition.onresult = (event: SpeechResultEvent) => {
+      const text = finalTranscriptFrom(event);
+      if (text) onTranscriptRef.current(text);
+    };
+    recognition.onerror = () => setIsListening(false);
+    recognition.onend = () => setIsListening(false);
+
+    recognitionRef.current = recognition;
+
+    return () => {
+      recognition.onresult = null;
+      recognition.onerror = null;
+      recognition.onend = null;
+      // Bez tego mikrofon zostawał otwarty po zamknięciu okna opisu zdjęcia.
       try {
-        recognitionRef.current?.start();
+        recognition.abort();
+      } catch {
+        /* obiekt mógł nigdy nie wystartować */
+      }
+      recognitionRef.current = null;
+    };
+  }, []);
+
+  const toggleListening = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const recognition = recognitionRef.current;
+      if (!recognition) {
+        const text = prompt(
+          "Wprowadzanie głosowe nie jest wspierane w tej przeglądarce. Wpisz tekst:"
+        );
+        if (text) onTranscriptRef.current(text.trim());
+        return;
+      }
+
+      if (isListening) {
+        try {
+          recognition.stop();
+        } catch {
+          /* już zatrzymane */
+        }
+        setIsListening(false);
+        return;
+      }
+
+      try {
+        recognition.start();
         setIsListening(true);
       } catch (err) {
+        // start() rzuca InvalidStateError, jeśli sesja już trwa.
         console.warn("Speech start error:", err);
         setIsListening(false);
       }
-    }
-  };
+    },
+    [isListening]
+  );
 
   return (
     <div className="relative inline-flex items-center">

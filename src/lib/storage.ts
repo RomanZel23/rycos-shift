@@ -144,6 +144,21 @@ export const saveStoredReport = (report: DailyReport): void => {
   }
 };
 
+/**
+ * Usuwa raport z lokalnej kopii archiwum. Wołane po skasowaniu wiersza
+ * w bazie — bez tego wpis wisiałby na liście do następnej synchronizacji,
+ * a przy braku znacznika cloudSyncedAt urządzenie próbowałoby go dosłać.
+ */
+export const removeStoredReport = (id: string): void => {
+  if (typeof window === "undefined" || !id) return;
+  try {
+    const remaining = getStoredReports().filter((r) => r.id !== id);
+    localStorage.setItem(STORAGE_KEYS.REPORTS, JSON.stringify(remaining));
+  } catch (err) {
+    console.warn("Storage remove report error:", err);
+  }
+};
+
 /** Nadpisuje całą lokalną listę raportów (używane po scaleniu z bazą). */
 export const saveStoredReports = (reports: DailyReport[]): void => {
   if (typeof window === "undefined") return;

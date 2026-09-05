@@ -17,6 +17,7 @@ import {
   RefreshCw,
   AlertCircle,
   AlertTriangle,
+  Trash2,
 } from "lucide-react";
 import { DailyReport, TenantSettings } from "@/types";
 import { sanitizePdfFileName } from "@/lib/pdf-generator";
@@ -82,6 +83,9 @@ interface ReportArchiveProps {
   onRefresh?: () => Promise<void>;
   isSyncing?: boolean;
   isSupabaseConnected?: boolean;
+  /** Przycisk „Usuń" widzi wyłącznie administrator. Serwer sprawdza to ponownie. */
+  canDelete?: boolean;
+  onDeleteReport?: (reportId: string) => Promise<{ ok: boolean; message: string }>;
 }
 
 interface ZoomPhotoData {
@@ -100,6 +104,8 @@ export function ReportArchive({
   onRefresh,
   isSyncing = false,
   isSupabaseConnected = true,
+  canDelete = false,
+  onDeleteReport,
 }: ReportArchiveProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<string>("ALL");
@@ -113,6 +119,10 @@ export function ReportArchive({
     success: boolean;
     message: string;
   } | null>(null);
+
+  // Usuwanie: pierwszy klik odsłania potwierdzenie, dopiero drugi kasuje.
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Zamykanie modali klawiszem Escape
   useEffect(() => {
@@ -209,6 +219,22 @@ export function ReportArchive({
         success: false,
         message: "Nie udało się pobrać dokumentu z archiwum.",
       });
+    }
+  };
+
+  const runDelete = async (report: DailyReport) => {
+    if (!onDeleteReport) return;
+    setDeletingId(report.id);
+    try {
+      const result = await onDeleteReport(report.id);
+      // Przy powodzeniu raport znika z listy, więc komunikat pokazujemy tylko
+      // wtedy, gdy coś poszło nie tak — inaczej wisiałby przy cudzym wierszu.
+      if (!result.ok) {
+        setResendStatus({ id: report.id, success: false, message: result.message });
+      }
+    } finally {
+      setDeletingId(null);
+      setConfirmingId(null);
     }
   };
 
@@ -522,8 +548,57 @@ export function ReportArchive({
                       <Download className="w-3.5 h-3.5" />
                       <span>Pobierz PDF</span>
                     </button>
+
+                    {/* Kasowanie tylko dla administratora. Dwa kroki, bo to
+                        dokumentacja z podpisami i nie ma jak jej cofnąć. */}
+                    {canDelete &&
+                      (confirmingId === report.id ? (
+                        <span className="inline-flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => runDelete(report)}
+                            disabled={deletingId === report.id}
+                            className="flex items-center gap-1.5 px-3.5 py-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-60 text-white rounded-xl text-xs sm:text-sm font-black transition-colors cursor-pointer"
+                          >
+                            <Trash2
+                              className={`w-3.5 h-3.5 ${deletingId === report.id ? "animate-pulse" : ""}`}
+                            />
+                            <span>
+                              {deletingId === report.id ? "Usuwanie..." : "Na pewno usuń"}
+                            </span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmingId(null)}
+                            disabled={deletingId === report.id}
+                            className="px-3 py-2 text-xs sm:text-sm font-bold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 cursor-pointer"
+                          >
+                            Anuluj
+                          </button>
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setResendStatus(null);
+                            setConfirmingId(report.id);
+                          }}
+                          title="Usuń raport z archiwum"
+                          className="flex items-center gap-1.5 px-3.5 py-2 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/70 dark:hover:bg-rose-900 text-rose-700 dark:text-rose-300 rounded-xl text-xs sm:text-sm font-bold transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Usuń</span>
+                        </button>
+                      ))}
                   </div>
                 </div>
+
+                {confirmingId === report.id && (
+                  <p className="text-[11px] font-bold text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900 rounded-xl px-3.5 py-2.5">
+                    Wpis zniknie z archiwum bez możliwości cofnięcia. Sam plik PDF razem ze
+                    zdjęciami i podpisami zostaje w magazynie.
+                  </p>
+                )}
 
                 {/* METADANE RAPORTU */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-slate-100 dark:border-slate-800 text-xs">
