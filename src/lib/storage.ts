@@ -7,26 +7,28 @@ export const INITIAL_SITES: ConstructionSite[] = [];
 export const INITIAL_TOPIC_TEMPLATES: DiscussedTopicTemplate[] = [];
 export const INITIAL_PDF_TEMPLATES: PdfTemplate[] = [];
 
+/**
+ * Etap 4: listy odbiorców są puste, bo prawdziwe adresy trzyma tabela
+ * `tenant_settings` i tylko ona liczy się przy wysyłce — `resolveEmailConfig`
+ * w src/lib/email.ts czyta je po stronie serwera i nigdy nie zagląda tutaj.
+ *
+ * Adresy zaszyte w kodzie były podwójnie szkodliwe. Po pierwsze, dane osobowe
+ * pracowników leżały w repozytorium i w bundlu wysyłanym do każdej przeglądarki.
+ * Po drugie, rozjeżdżały się z bazą: gdy ktoś zmienił odbiorców w panelu, panel
+ * i tak potrafił pokazać starą listę z kodu, więc nie było wiadomo, dokąd
+ * naprawdę idą raporty.
+ *
+ * To jest wyłącznie kształt obiektu na czas, zanim pierwsza synchronizacja
+ * przyniesie ustawienia z bazy.
+ */
 export const INITIAL_SETTINGS: TenantSettings = {
   tenantId: "tenant-sb-tech-poznan",
   organizationName: "SolutionsBay / SB Technology",
   logoText: "SB Technology",
   logoSubtitle: "RYCOS Shift workflow",
-  startShiftEmailRecipients: [
-    "marcin.bajda@solutionsbay.pl",
-    "jaroslaw.sarna@solutionsbay.pl",
-    "tomasz.kowal@kza.com.pl",
-    "karolina.kaminska@kza.com.pl",
-    "roman.zeleznik@solutionsbay.pl",
-  ],
-  endShiftEmailRecipients: [
-    "marcin.bajda@solutionsbay.pl",
-    "jaroslaw.sarna@solutionsbay.pl",
-    "tomasz.kowal@kza.com.pl",
-    "karolina.kaminska@kza.com.pl",
-    "roman.zeleznik@solutionsbay.pl",
-  ],
-  resendFromEmail: "raporty@shift.rycos.eu",
+  startShiftEmailRecipients: [],
+  endShiftEmailRecipients: [],
+  resendFromEmail: "",
   storageFolder: "Raporty_RYCOS_Shift_Poznan",
 };
 
@@ -99,30 +101,11 @@ export const getStoredSettings = (): TenantSettings => {
   try {
     const data = localStorage.getItem(STORAGE_KEYS.SETTINGS);
     if (!data) return INITIAL_SETTINGS;
-    const parsed: TenantSettings = JSON.parse(data);
-    let changed = false;
-    if (parsed.resendFromEmail && parsed.resendFromEmail.includes("solutionsbay.pl")) {
-      parsed.resendFromEmail = "raporty@shift.rycos.eu";
-      changed = true;
-    }
-    if (
-      parsed.startShiftEmailRecipients &&
-      parsed.startShiftEmailRecipients.some((e) => e.includes("raporty-start@solutionsbay.pl"))
-    ) {
-      parsed.startShiftEmailRecipients = INITIAL_SETTINGS.startShiftEmailRecipients;
-      changed = true;
-    }
-    if (
-      parsed.endShiftEmailRecipients &&
-      parsed.endShiftEmailRecipients.some((e) => e.includes("raporty-koniec@solutionsbay.pl"))
-    ) {
-      parsed.endShiftEmailRecipients = INITIAL_SETTINGS.endShiftEmailRecipients;
-      changed = true;
-    }
-    if (changed) {
-      localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(parsed));
-    }
-    return parsed;
+    // Etap 4: usunięta łatka podmieniająca stare adresy `raporty-start@` /
+    // `raporty-koniec@` na listę z kodu. Adresów tych nie ma już w bazie, a łatka
+    // nadpisywała cache własnymi wpisami przy każdym odczycie — czyli robiła
+    // dokładnie to, przed czym miała chronić.
+    return JSON.parse(data) as TenantSettings;
   } catch {
     return INITIAL_SETTINGS;
   }

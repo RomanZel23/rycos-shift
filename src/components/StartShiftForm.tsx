@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   Calendar,
   Clock,
@@ -9,6 +9,7 @@ import {
   Plus,
   Trash2,
   Send,
+  RotateCcw,
   Download,
   CheckCircle2,
   AlertTriangle,
@@ -31,6 +32,9 @@ import { SignatureModal } from "./SignatureModal";
 import { AddTopicModal } from "./AddTopicModal";
 import { saveStoredReport } from "@/lib/storage";
 import { getPolishCurrentDate, getPolishCurrentTime } from "@/lib/date-utils";
+import { useFormDraft } from "@/lib/use-form-draft";
+import { newPrefixedId } from "@/lib/ids";
+import { StartShiftDraft, formatDraftTime } from "@/lib/draft-store";
 
 interface StartShiftFormProps {
   sites: ConstructionSite[];
@@ -78,6 +82,31 @@ export function StartShiftForm({
   const [emailWarning, setEmailWarning] = useState<string | null>(null);
   const [successReport, setSuccessReport] = useState<DailyReport | null>(null);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
+
+  // Etap 4: automatyczny szkic w IndexedDB. Podpisy odręczne są tu tym, czym
+  // zdjęcia w fotorelacji — nie da się ich odtworzyć bez ponownego zbierania
+  // ludzi, więc wyjście z ekranu nie może ich kasować.
+  const draftPayload = useMemo<StartShiftDraft>(
+    () => ({ date, time, siteId, foremanId, location, discussedTopics, attendanceList }),
+    [date, time, siteId, foremanId, location, discussedTopics, attendanceList]
+  );
+
+  const { restoredAt, discard: discardDraft } = useFormDraft<StartShiftDraft>(
+    "START_SHIFT",
+    draftPayload,
+    {
+      enabled: !successReport,
+      onRestore: (draft) => {
+        if (draft.siteId) setSiteId(draft.siteId);
+        if (draft.foremanId) setForemanId(draft.foremanId);
+        if (draft.date) setDate(draft.date);
+        if (draft.time) setTime(draft.time);
+        if (draft.location) setLocation(draft.location);
+        if (Array.isArray(draft.discussedTopics)) setDiscussedTopics(draft.discussedTopics);
+        if (Array.isArray(draft.attendanceList)) setAttendanceList(draft.attendanceList);
+      },
+    }
+  );
 
   // Inicjalizacja daty, godziny, domyślnego placu i brygadzisty
   useEffect(() => {
@@ -164,7 +193,7 @@ export function StartShiftForm({
         : "Brygadzista";
 
       let reportData: DailyReport = {
-        id: "rep-start-" + Date.now(),
+        id: newPrefixedId("rep-start"),
         tenantId: settings.tenantId,
         reportType: "START_SHIFT",
         date,
@@ -197,6 +226,9 @@ export function StartShiftForm({
         const failed: DailyReport = {
           ...reportData,
           status: "FAILED",
+          // Nic nie poszło mailem — lista odbiorców z ustawień byłaby tu
+          // nieprawdą i w archiwum wyglądałoby to na wysłany raport.
+          sentToEmails: [],
           errorMessage: resData?.message || "Nie udało się zapisać raportu na serwerze.",
         };
         saveStoredReport(failed);
@@ -215,6 +247,7 @@ export function StartShiftForm({
 
       saveStoredReport(saved);
       if (onReportCreated) onReportCreated(saved);
+      discardDraft();
       setEmailWarning(resData.emailSent ? null : resData.message || null);
       reportData = saved;
 
@@ -231,6 +264,7 @@ export function StartShiftForm({
     setSuccessReport(null);
     setEmailWarning(null);
     setAttendanceList([]);
+    discardDraft();
     setDiscussedTopics(["Szkolenie BHP i instruktaż stanowiskowy przed rozpoczęciem prac"]);
     setDate(getPolishCurrentDate());
     setTime(getPolishCurrentTime());
@@ -365,6 +399,30 @@ export function StartShiftForm({
               </div>
             </div>
           </div>
+
+          {restoredAt && (
+            <div className="mb-4 p-3.5 bg-sky-50 dark:bg-sky-950/50 border-2 border-sky-300 dark:border-sky-800 rounded-2xl flex items-start gap-2.5">
+              <RotateCcw className="w-4 h-4 text-sky-600 dark:text-sky-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-black text-sky-900 dark:text-sky-200">
+                  Przywrócono niedokończoną odprawę z godz. {formatDraftTime(restoredAt)}
+                </div>
+                <p className="text-[11px] text-sky-900/80 dark:text-sky-200/80 mt-0.5 leading-relaxed">
+                  Podpisy i omawiane obszary zostały odtworzone. Możesz dokończyć albo zacząć od nowa.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setAttendanceList([]);
+                  discardDraft();
+                }}
+                className="flex-shrink-0 px-3 py-1.5 text-[11px] font-black text-sky-800 dark:text-sky-200 bg-sky-100 dark:bg-sky-900/70 hover:bg-sky-200 dark:hover:bg-sky-900 rounded-xl transition-colors cursor-pointer"
+              >
+                Zacznij od nowa
+              </button>
+            </div>
+          )}
 
           {errorBanner && (
             <div className="p-4 sm:p-5 bg-rose-50 dark:bg-rose-950/70 border-2 border-rose-300 dark:border-rose-800 rounded-2xl text-rose-900 dark:text-rose-100 text-sm sm:text-base font-bold flex items-center gap-3 animate-shake shadow-md">

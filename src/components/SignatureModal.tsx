@@ -3,6 +3,7 @@
 import React, { useRef, useState, useEffect, useCallback } from "react";
 import { X, Check, RotateCcw, PenTool, User as UserIcon, AlertCircle } from "lucide-react";
 import { User, AttendanceRecord } from "@/types";
+import { newPrefixedId } from "@/lib/ids";
 
 interface SignatureModalProps {
   isOpen: boolean;
@@ -193,7 +194,7 @@ export function SignatureModal({
     const signatureDataUrl = canvas.toDataURL("image/png");
 
     const record: AttendanceRecord = {
-      id: "att-" + Date.now() + "-" + Math.random().toString(36).substr(2, 5),
+      id: newPrefixedId("att"),
       userId: currentSelectedUser.id,
       userName: `${currentSelectedUser.firstName} ${currentSelectedUser.lastName}`,
       userRole: currentSelectedUser.role || (isForemanModal ? "Brygadzista" : "Pracownik"),

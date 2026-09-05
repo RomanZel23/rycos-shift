@@ -38,7 +38,17 @@ export function sanitizePdfFileName(name: string): string {
     .replace(/\s+/g, "_")
     .replace(/[^a-zA-Z0-9._-]/g, "")
     .replace(/_+/g, "_")
-    .replace(/-+/g, "-");
+    .replace(/-+/g, "-")
+    // Etap 4: ciągi kropek. Ukośniki i tak wypadały wyżej, więc wyjście z katalogu
+    // nie było możliwe, ale ".." w nazwie pliku przechodziło przez walidator ścieżek
+    // w buckecie i zostawało w nagłówku Content-Disposition. Taniej to uciąć,
+    // niż za pół roku dowodzić, że akurat tutaj było niegroźne.
+    .replace(/\.{2,}/g, ".")
+    // Kropka lub myślnik na początku robi plik ukryty albo nazwę wyglądającą
+    // jak przełącznik wiersza poleceń.
+    .replace(/^[.-]+/, "");
+
+  if (!clean || clean === ".pdf") clean = "Raport";
 
   if (!clean.toLowerCase().endsWith(".pdf")) {
     clean += ".pdf";

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import {
   Calendar,
   Clock,
@@ -10,6 +10,7 @@ import {
   Trash2,
   Send,
   Download,
+  RotateCcw,
   CheckCircle2,
   AlertTriangle,
   FileText,
@@ -28,6 +29,9 @@ import { GeoLocationBadge } from "./GeoLocationBadge";
 import { VoiceInputButton } from "./VoiceInputButton";
 import { saveStoredReport } from "@/lib/storage";
 import { getPolishCurrentDate, getPolishCurrentTime } from "@/lib/date-utils";
+import { useFormDraft } from "@/lib/use-form-draft";
+import { newPrefixedId } from "@/lib/ids";
+import { EndShiftDraft, formatDraftTime } from "@/lib/draft-store";
 
 interface EndShiftFormProps {
   sites: ConstructionSite[];
@@ -67,6 +71,31 @@ export function EndShiftForm({
   const [emailWarning, setEmailWarning] = useState<string | null>(null);
   const [successReport, setSuccessReport] = useState<DailyReport | null>(null);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
+
+  // Etap 4: automatyczny szkic. Zdjęcia to jedyne dane w tym formularzu,
+  // których nie da się odtworzyć z pamięci — wyjście z ekranu kasowało je bez
+  // ostrzeżenia. Szkic ląduje w IndexedDB, nie w localStorage, bo kilka zdjęć
+  // w base64 przekracza limit tego drugiego.
+  const draftPayload = useMemo<EndShiftDraft>(
+    () => ({ date, time, siteId, foremanId, location, photos }),
+    [date, time, siteId, foremanId, location, photos]
+  );
+
+  const { restoredAt, discard: discardDraft } = useFormDraft<EndShiftDraft>(
+    "END_SHIFT",
+    draftPayload,
+    {
+      enabled: !successReport,
+      onRestore: (draft) => {
+        if (draft.siteId) setSiteId(draft.siteId);
+        if (draft.foremanId) setForemanId(draft.foremanId);
+        if (draft.date) setDate(draft.date);
+        if (draft.time) setTime(draft.time);
+        if (draft.location) setLocation(draft.location);
+        if (Array.isArray(draft.photos)) setPhotos(draft.photos);
+      },
+    }
+  );
 
   useEffect(() => {
     setDate(getPolishCurrentDate());
@@ -130,7 +159,7 @@ export function EndShiftForm({
   const handleConfirmAddPhoto = () => {
     if (!tempPhotoUrl) return;
     const newItem: PhotoDocumentationItem = {
-      id: "photo-" + Date.now() + "-" + Math.random().toString(36).substr(2, 4),
+      id: newPrefixedId("photo"),
       photoDataUrl: tempPhotoUrl,
       description: tempDescription.trim() || "Dokumentacja stanu robót na placu budowy.",
       takenAt: new Date().toISOString(),
@@ -178,7 +207,7 @@ export function EndShiftForm({
         : "Brygadzista";
 
       let reportData: DailyReport = {
-        id: "rep-end-" + Date.now(),
+        id: newPrefixedId("rep-end"),
         tenantId: settings.tenantId,
         reportType: "END_SHIFT",
         date,
@@ -210,6 +239,9 @@ export function EndShiftForm({
         const failed: DailyReport = {
           ...reportData,
           status: "FAILED",
+          // Nic nie poszło mailem — lista odbiorców z ustawień byłaby tu
+          // nieprawdą i w archiwum wyglądałoby to na wysłany raport.
+          sentToEmails: [],
           errorMessage: resData?.message || "Nie udało się zapisać raportu na serwerze.",
         };
         saveStoredReport(failed);
@@ -228,6 +260,7 @@ export function EndShiftForm({
 
       saveStoredReport(saved);
       if (onReportCreated) onReportCreated(saved);
+      discardDraft();
       setEmailWarning(resData.emailSent ? null : resData.message || null);
       reportData = saved;
 
@@ -244,6 +277,7 @@ export function EndShiftForm({
     setSuccessReport(null);
     setEmailWarning(null);
     setPhotos([]);
+    discardDraft();
     setDate(getPolishCurrentDate());
     setTime(getPolishCurrentTime());
   };
@@ -380,6 +414,30 @@ export function EndShiftForm({
               </div>
             </div>
           </div>
+
+          {restoredAt && (
+            <div className="mb-4 p-3.5 bg-sky-50 dark:bg-sky-950/50 border-2 border-sky-300 dark:border-sky-800 rounded-2xl flex items-start gap-2.5">
+              <RotateCcw className="w-4 h-4 text-sky-600 dark:text-sky-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-black text-sky-900 dark:text-sky-200">
+                  Przywrócono niedokończony raport z godz. {formatDraftTime(restoredAt)}
+                </div>
+                <p className="text-[11px] text-sky-900/80 dark:text-sky-200/80 mt-0.5 leading-relaxed">
+                  Zdjęcia i ustawienia zostały odtworzone. Możesz dokończyć raport albo zacząć od nowa.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setPhotos([]);
+                  discardDraft();
+                }}
+                className="flex-shrink-0 px-3 py-1.5 text-[11px] font-black text-sky-800 dark:text-sky-200 bg-sky-100 dark:bg-sky-900/70 hover:bg-sky-200 dark:hover:bg-sky-900 rounded-xl transition-colors cursor-pointer"
+              >
+                Zacznij od nowa
+              </button>
+            </div>
+          )}
 
           {errorBanner && (
             <div className="p-4 sm:p-5 bg-rose-50 dark:bg-rose-950/70 border-2 border-rose-300 dark:border-rose-800 rounded-2xl text-rose-900 dark:text-rose-100 text-sm sm:text-base font-bold flex items-center gap-3 animate-shake shadow-md">

@@ -1,13 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   FileText,
   Download,
   Eye,
-  Calendar,
-  Building2,
-  UserCheck,
   Search,
   Filter,
   CheckCircle2,
@@ -18,12 +15,16 @@ import {
   ExternalLink,
   Maximize2,
   RefreshCw,
-  Database,
   AlertCircle,
+  AlertTriangle,
 } from "lucide-react";
 import { DailyReport, TenantSettings } from "@/types";
 import { sanitizePdfFileName } from "@/lib/pdf-generator";
 import { formatPolishTime } from "@/lib/date-utils";
+import { findReportGaps, formatGapDate, missingLabel } from "@/lib/report-gaps";
+
+/** Dłuższa lista braków zamieniłaby ostrzeżenie w ścianę tekstu. */
+const MAX_VISIBLE_GAPS = 6;
 
 interface ReportArchiveProps {
   reports: DailyReport[];
@@ -123,6 +124,10 @@ export function ReportArchive({
       (r.pdfFileName && r.pdfFileName.toLowerCase().includes(searchTerm.toLowerCase()));
     return matchesType && matchesSearch;
   }).sort((a, b) => sortKey(b).localeCompare(sortKey(a)));
+
+  // Braki liczymy z pełnej listy, nie z przefiltrowanej — inaczej włączenie
+  // filtra „Rozpoczęcie prac" zgłosiłoby brak fotorelacji w każdym dniu.
+  const gaps = useMemo(() => findReportGaps(reports), [reports]);
 
   /**
    * Etap 3: pobieramy ZARCHIWIZOWANY plik, a nie generujemy nowego.
@@ -337,6 +342,53 @@ export function ReportArchive({
           </button>
         </div>
       </div>
+
+      {/* BRAKUJĄCE RAPORTY — patrz src/lib/report-gaps.ts */}
+      {gaps.length > 0 && (
+        <div className="bg-amber-50 dark:bg-amber-950/40 border-2 border-amber-300 dark:border-amber-800 rounded-3xl p-5 sm:p-6 space-y-3">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-black text-sm sm:text-base text-amber-900 dark:text-amber-100">
+                {gaps.length === 1
+                  ? "Jeden dzień ma niekompletną dokumentację"
+                  : `${gaps.length} dni ma niekompletną dokumentację`}
+              </h3>
+              <p className="text-[11px] sm:text-xs text-amber-900/80 dark:text-amber-200/80 mt-0.5 leading-relaxed">
+                Każdy dzień pracy powinien mieć odprawę BHP i fotorelację końcową. Poniżej dni,
+                w których jest tylko jeden z tych dokumentów.
+              </p>
+            </div>
+          </div>
+
+          <ul className="space-y-1.5">
+            {gaps.slice(0, MAX_VISIBLE_GAPS).map((gap) => (
+              <li
+                key={`${gap.date}|${gap.siteId}|${gap.missing}`}
+                className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs sm:text-sm bg-white/70 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded-2xl px-3.5 py-2.5"
+              >
+                <span className="font-black text-amber-900 dark:text-amber-100 tabular-nums">
+                  {formatGapDate(gap.date)}
+                </span>
+                <span className="font-bold text-amber-800/90 dark:text-amber-200/90">
+                  {gap.siteName}
+                </span>
+                <span className="text-amber-900/70 dark:text-amber-200/70">
+                  — brakuje {missingLabel(gap.missing)}
+                </span>
+              </li>
+            ))}
+          </ul>
+
+          {gaps.length > MAX_VISIBLE_GAPS && (
+            <p className="text-[11px] font-bold text-amber-900/70 dark:text-amber-200/70">
+              …oraz {gaps.length - MAX_VISIBLE_GAPS} wcześniejszych.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* LISTA RAPORTÓW */}
       {filteredReports.length === 0 ? (
