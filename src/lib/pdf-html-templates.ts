@@ -25,7 +25,7 @@ import { formatPolishTime } from "./date-utils";
  * systemu użytkownika — to ich metryki psuły poprzedni układ.
  */
 
-import { COMPANY, fullLogoSvg } from "./brand";
+import { fullLogoSvg } from "./brand";
 
 const FONT_STACK = "'Liberation Sans', 'DejaVu Sans', Arial, Helvetica, sans-serif";
 const FONT_MONO = "'DejaVu Sans Mono', 'Liberation Mono', monospace";
@@ -327,13 +327,17 @@ function renderMeta(report: DailyReport): string {
   `;
 }
 
-function renderClosing(settings?: TenantSettings): string {
-  const org = settings?.organizationName || COMPANY.legalName;
+/**
+ * Zamknięcie raportu. Nazwa spółki celowo się tu NIE pojawia — od czasu, gdy
+ * stopka strony niesie pełne dane rejestrowe na każdej stronie, powtarzanie
+ * jej tuż nad stopką było zdublowaniem tej samej informacji.
+ */
+function renderClosing(): string {
   return `
     <div class="closing">
       <div class="formula">[Koniec raportu]</div>
       <div style="margin-top: 4px;">
-        ${escapeHtml(org)} &bull; dokument wygenerowany automatycznie przez system RYCOS Shift.
+        Dokument wygenerowany automatycznie przez system RYCOS Shift.
       </div>
     </div>
   `;
@@ -420,7 +424,7 @@ export function generateStartShiftHtml(
       <tbody>${rowsHtml}</tbody>
     </table>
 
-    ${renderClosing(settings)}
+    ${renderClosing()}
   `);
 }
 
@@ -461,6 +465,6 @@ export function generateEndShiftHtml(
     <h2 class="section">Dokumentacja fotograficzna wykonanych robót</h2>
     ${cardsHtml}
 
-    ${renderClosing(settings)}
+    ${renderClosing()}
   `);
 }
