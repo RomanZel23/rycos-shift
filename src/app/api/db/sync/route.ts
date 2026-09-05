@@ -58,7 +58,13 @@ export async function GET(req: NextRequest) {
       supabase.from("construction_sites").select("*").order("name", { ascending: true }),
       supabase.from("topic_templates").select("*").order("created_at", { ascending: true }),
       supabase.from("tenant_settings").select("*").limit(1).maybeSingle(),
-      supabase.from(REPORTS_TABLE).select(REPORT_COLUMNS).order("report_date", { ascending: false }),
+      // Data ORAZ godzina — samo report_date porządkuje tylko dni, a w obrębie
+      // jednego dnia zostawia kolejność, jaką akurat zwróci Postgres.
+      supabase
+        .from(REPORTS_TABLE)
+        .select(REPORT_COLUMNS)
+        .order("report_date", { ascending: false })
+        .order("report_time", { ascending: false }),
       supabase.from("pdf_templates").select("*").order("created_at", { ascending: true }),
     ]);
 

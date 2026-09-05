@@ -96,6 +96,23 @@ export function ReportArchive({
     setZoomPhoto(null);
   };
 
+  /**
+   * Klucz sortowania: "RRRR-MM-DDTHH:mm". Oba pola są zerowane do stałej
+   * szerokości, więc porównanie tekstowe daje poprawny porządek chronologiczny
+   * bez parsowania dat.
+   *
+   * Sortujemy tutaj, a nie tylko w zapytaniu do bazy, bo lista w archiwum jest
+   * sklejana z trzech źródeł: raportów właśnie dosłanych, wciąż czekających
+   * lokalnie i tych z chmury. Kolejność z bazy dotyczy wyłącznie tej trzeciej
+   * grupy.
+   */
+  const sortKey = (r: DailyReport): string => {
+    const date = (r.date || "").slice(0, 10);
+    const time = (r.time || "").slice(0, 5).padStart(5, "0");
+    if (date) return `${date}T${time}`;
+    return (r.sentAt || "").slice(0, 16);
+  };
+
   const filteredReports = reports.filter((r) => {
     const matchesType =
       filterType === "ALL" || r.reportType === filterType;
@@ -105,7 +122,7 @@ export function ReportArchive({
       r.date.includes(searchTerm) ||
       (r.pdfFileName && r.pdfFileName.toLowerCase().includes(searchTerm.toLowerCase()));
     return matchesType && matchesSearch;
-  });
+  }).sort((a, b) => sortKey(b).localeCompare(sortKey(a)));
 
   /**
    * Etap 3: pobieramy ZARCHIWIZOWANY plik, a nie generujemy nowego.
