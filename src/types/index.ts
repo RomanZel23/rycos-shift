@@ -74,6 +74,11 @@ export interface DailyReport {
   sentAt: string;
   status: 'SENT' | 'SAVED_LOCAL' | 'FAILED';
   errorMessage?: string;
+  // --- Pola wyłącznie lokalne (cache urządzenia). Nie mają kolumn w bazie
+  // i są ignorowane przez mapowanie w /api/db/sync. Sterują kolejką offline:
+  // dopóki cloudSyncedAt jest puste, raport jest uznawany za niedosłany.
+  cloudSyncedAt?: string;
+  syncAttempts?: number;
 }
 
 export interface TenantSettings {

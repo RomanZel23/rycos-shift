@@ -29,6 +29,11 @@ import {
   saveStoredSettings,
   getStoredReports,
   saveStoredReport,
+  saveStoredReports,
+  markStoredReportSynced,
+  bumpStoredReportAttempt,
+  ensureReportSyncSchema,
+  MAX_SYNC_ATTEMPTS,
   getStoredPdfTemplates,
   saveStoredPdfTemplates,
   getStoredLoggedUser,
@@ -110,32 +115,70 @@ export default function Home() {
           saveStoredSettings(dbSettings);
         }
         if (Array.isArray(dbReports)) {
-          // Sprawdź, czy na urządzeniu są raporty, które jeszcze nie zdążyły trafić do bazy Supabase
+          // Raport lokalny nieobecny w chmurze może znaczyć dwie różne rzeczy:
+          //   a) nigdy nie potwierdzono jego zapisu (brak cloudSyncedAt) -> dosyłamy,
+          //   b) był już potwierdzony -> ktoś skasował go w bazie, usuwamy z cache.
+          // Brak tego rozróżnienia powodował, że skasowane rekordy wracały do bazy
+          // przy każdym odświeżeniu archiwum.
+          const cloudIds = new Set(dbReports.map((r: DailyReport) => r.id));
           const localReports = getStoredReports();
-          const missingInCloud = localReports.filter(
-            (local) => !dbReports.some((db) => db.id === local.id)
+
+          // Raport obecny w bazie jest z definicji zsynchronizowany. Bez tego
+          // stempla wersja z API nadpisywałaby lokalny znacznik i raport
+          // skasowany później w bazie znów wyglądałby na niedosłany.
+          const syncedNow = new Date().toISOString();
+          const cloudReports: DailyReport[] = dbReports.map((r: DailyReport) => ({
+            ...r,
+            cloudSyncedAt: syncedNow,
+            syncAttempts: 0,
+          }));
+
+          const toUpload = localReports.filter(
+            (r) =>
+              !cloudIds.has(r.id) &&
+              !r.cloudSyncedAt &&
+              (r.syncAttempts || 0) < MAX_SYNC_ATTEMPTS
           );
 
-          if (missingInCloud.length > 0) {
-            console.log(`Wykryto ${missingInCloud.length} lokalnych raportów do dosłania do Supabase`);
-            // Wyślij brakujące raporty w tle do Supabase
-            for (const missing of missingInCloud) {
-              fetch("/api/db/sync", {
+          const justUploaded: DailyReport[] = [];
+          for (const missing of toUpload) {
+            try {
+              const uploadRes = await fetch("/api/db/sync", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ action: "SAVE_REPORT", report: missing }),
-              }).catch((err) => console.warn("Auto-sync missing report error:", err));
+              });
+              const uploadJson = await uploadRes.json();
+              if (uploadJson.success) {
+                // optimizedReport ma lekkie adresy /api/files zamiast base64
+                const light: DailyReport = {
+                  ...missing,
+                  ...(uploadJson.optimizedReport || {}),
+                  cloudSyncedAt: new Date().toISOString(),
+                  syncAttempts: 0,
+                };
+                markStoredReportSynced(missing.id, uploadJson.optimizedReport);
+                justUploaded.push(light);
+              } else {
+                bumpStoredReportAttempt(missing.id);
+              }
+            } catch (uploadErr) {
+              console.warn("Auto-sync missing report error:", uploadErr);
+              bumpStoredReportAttempt(missing.id);
             }
           }
 
-          const mergedReports = [
-            ...missingInCloud,
-            ...dbReports,
-          ];
+          // Nadal lokalne: niedosłane (w tym te po wyczerpaniu prób), bez tych z tej rundy
+          const stillPending = getStoredReports().filter(
+            (r) =>
+              !cloudIds.has(r.id) &&
+              !r.cloudSyncedAt &&
+              !justUploaded.some((j) => j.id === r.id)
+          );
+
+          const mergedReports = [...justUploaded, ...stillPending, ...cloudReports];
           setReports(mergedReports);
-          try {
-            localStorage.setItem("rycos_shift_reports_v1", JSON.stringify(mergedReports));
-          } catch {}
+          saveStoredReports(mergedReports);
         }
         if (Array.isArray(dbTemplates)) {
           setPdfTemplates(dbTemplates);
@@ -189,6 +232,10 @@ export default function Home() {
   // Inicjalizacja z localStorage i synchronizacja w tle przy starcie
   useEffect(() => {
     try {
+      // Jednorazowo ostemplowaj stary cache raportów jako zsynchronizowany,
+      // inaczej pierwsze odświeżenie po wdrożeniu wypchnęłoby go z powrotem do bazy.
+      ensureReportSyncSchema();
+
       const loadedUsers = getStoredUsers();
       const loadedSites = getStoredSites();
       const loadedTopics = getStoredTopics();
@@ -293,11 +340,23 @@ export default function Home() {
         body: JSON.stringify({ action: "SAVE_REPORT", report: newReport }),
       });
       const data = await res.json();
-      if (!data.success) {
+      if (data.success) {
+        // Potwierdzony zapis: oznacz raport i podmień ciężkie base64 na adresy
+        // /api/files, żeby lokalny cache nie rósł do rozmiaru całego PDF-a.
+        markStoredReportSynced(newReport.id, data.optimizedReport);
+        const light: DailyReport = {
+          ...newReport,
+          ...(data.optimizedReport || {}),
+          cloudSyncedAt: new Date().toISOString(),
+        };
+        setReports((prev) => prev.map((r) => (r.id === light.id ? light : r)));
+      } else {
         console.warn("Zapis do bazy danych zwrócił błąd:", data.message);
+        bumpStoredReportAttempt(newReport.id);
       }
     } catch (err) {
       console.warn("Błąd sieciowy podczas zapisu raportu do Supabase:", err);
+      bumpStoredReportAttempt(newReport.id);
     }
   };
 

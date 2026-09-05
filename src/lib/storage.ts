@@ -41,7 +41,11 @@ const STORAGE_KEYS = {
   TEMPLATES: "rycos_shift_templates_v1",
   CURRENT_USER_ID: "rycos_shift_current_user_v1",
   LOGGED_USER: "rycos_shift_logged_user_v1",
+  SYNC_SCHEMA: "rycos_shift_sync_schema_v1",
 };
+
+/** Po tylu nieudanych próbach przestajemy dosyłać raport przy każdym odświeżeniu. */
+export const MAX_SYNC_ATTEMPTS = 5;
 
 export const getStoredUsers = (): User[] => {
   if (typeof window === "undefined") return [];
@@ -155,6 +159,80 @@ export const saveStoredReport = (report: DailyReport): void => {
     localStorage.setItem(STORAGE_KEYS.REPORTS, JSON.stringify(existing));
   } catch (err) {
     console.warn("Storage save report error:", err);
+  }
+};
+
+/** Nadpisuje całą lokalną listę raportów (używane po scaleniu z bazą). */
+export const saveStoredReports = (reports: DailyReport[]): void => {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(STORAGE_KEYS.REPORTS, JSON.stringify(reports));
+  } catch (err) {
+    console.warn("Storage save reports error:", err);
+  }
+};
+
+/**
+ * Oznacza raport jako potwierdzony w bazie. Od tej chwili jego brak w chmurze
+ * znaczy „skasowany w bazie", a nie „jeszcze niedosłany" — dzięki temu raport
+ * usunięty w Supabase nie wraca przy kolejnej synchronizacji.
+ */
+export const markStoredReportSynced = (
+  id: string,
+  replacement?: Partial<DailyReport>
+): void => {
+  if (typeof window === "undefined") return;
+  try {
+    const reports = getStoredReports().map((r) =>
+      r.id === id
+        ? {
+            ...r,
+            ...(replacement || {}),
+            cloudSyncedAt: new Date().toISOString(),
+            syncAttempts: 0,
+          }
+        : r
+    );
+    saveStoredReports(reports);
+  } catch (err) {
+    console.warn("Storage mark synced error:", err);
+  }
+};
+
+/** Zwiększa licznik nieudanych prób dosłania. */
+export const bumpStoredReportAttempt = (id: string): void => {
+  if (typeof window === "undefined") return;
+  try {
+    const reports = getStoredReports().map((r) =>
+      r.id === id ? { ...r, syncAttempts: (r.syncAttempts || 0) + 1 } : r
+    );
+    saveStoredReports(reports);
+  } catch (err) {
+    console.warn("Storage bump attempt error:", err);
+  }
+};
+
+/**
+ * Jednorazowa migracja cache'u urządzenia.
+ *
+ * Raporty zapisane przed wprowadzeniem cloudSyncedAt nie mają tego znacznika,
+ * więc nowa logika uznałaby je za niedosłane i wypchnęła z powrotem do bazy —
+ * czyli dokładnie ten sam błąd, który naprawiamy. Wszystkie pochodzą z bazy
+ * (stara pętla dbała o to aż nadto), więc stemplujemy je jako zsynchronizowane.
+ */
+export const ensureReportSyncSchema = (): void => {
+  if (typeof window === "undefined") return;
+  try {
+    if (localStorage.getItem(STORAGE_KEYS.SYNC_SCHEMA)) return;
+    const stamped = getStoredReports().map((r) => ({
+      ...r,
+      cloudSyncedAt: r.cloudSyncedAt || new Date().toISOString(),
+      syncAttempts: 0,
+    }));
+    saveStoredReports(stamped);
+    localStorage.setItem(STORAGE_KEYS.SYNC_SCHEMA, "v1");
+  } catch (err) {
+    console.warn("Storage sync-schema migration error:", err);
   }
 };
 

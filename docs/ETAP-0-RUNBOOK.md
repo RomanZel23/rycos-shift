@@ -35,6 +35,12 @@ więc trzeba rozważyć zgłoszenie naruszenia (72 h od stwierdzenia).
 
 ## 3. Migracja SQL
 
+> **Konwencja projektu:** migracje uruchamiamy **ręcznie** w Supabase SQL Editor.
+> Nie ma CI ani `supabase db push` — Coolify buduje wyłącznie obraz Next i bazy
+> nie dotyka, więc `git push` nigdy nie zmienia schematu. Pliki w
+> `supabase/migrations/` są numerowane rosnąco i uruchamiane po kolei;
+> każdy kończy się sekcją „WERYFIKACJA" do odklikania po wykonaniu.
+
 Supabase → SQL Editor → wklej i uruchom:
 
 ```
