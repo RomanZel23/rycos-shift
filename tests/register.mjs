@@ -7,18 +7,30 @@
  * w kodzie produkcyjnym i bez dokładania paczek do projektu.
  */
 import { registerHooks } from "node:module";
-import { existsSync } from "node:fs";
+import { statSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, resolve as resolvePath } from "node:path";
 
 const SRC = resolvePath(dirname(fileURLToPath(import.meta.url)), "..", "src");
 
-/** Dokłada .ts/.tsx, jeśli plik bez rozszerzenia nie istnieje. */
+function isFile(path) {
+  try {
+    return statSync(path).isFile();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Dokłada .ts/.tsx albo /index.ts. Sprawdzamy, czy trafiliśmy w PLIK, a nie
+ * tylko czy ścieżka istnieje: `@/types` wskazuje na katalog src/types, który
+ * istnieje, i import katalogu kończy się błędem EISDIR.
+ */
 function withExtension(fileUrl) {
   const path = fileURLToPath(fileUrl);
-  if (existsSync(path)) return fileUrl;
-  for (const candidate of [`${path}.ts`, `${path}.tsx`, `${path}/index.ts`]) {
-    if (existsSync(candidate)) return pathToFileURL(candidate).href;
+  if (isFile(path)) return fileUrl;
+  for (const candidate of [`${path}.ts`, `${path}.tsx`, `${path}/index.ts`, `${path}/index.tsx`]) {
+    if (isFile(candidate)) return pathToFileURL(candidate).href;
   }
   return fileUrl;
 }

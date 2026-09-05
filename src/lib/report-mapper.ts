@@ -1,4 +1,7 @@
-import {
+// `import type` — same typy, nic z tego modułu nie istnieje w czasie wykonania.
+// Bez tego runtime (i testy przez `node --test`) próbuje pobrać z @/types
+// nieistniejące eksporty.
+import type {
   AttendanceRecord,
   DailyReport,
   PhotoDocumentationItem,
@@ -21,7 +24,7 @@ export const REPORTS_TABLE = "reports";
 export const REPORT_COLUMNS =
   "id, tenant_id, report_type, report_date, report_time, site_id, site_name, " +
   "foreman_id, foreman_name, location, discussed_topics, attendance, photos, " +
-  "pdf_file_name, pdf_path, legacy_pdf_base64, sent_to_emails, sent_at, status, " +
+  "pdf_file_name, pdf_path, legacy_pdf_base64, sent_to_emails, sent_at, email_sent_at, status, " +
   "error_message, created_by, created_by_name, created_at";
 
 interface AttendanceRow {
@@ -62,6 +65,7 @@ export interface ReportRow {
   legacy_pdf_base64?: string | null;
   sent_to_emails: string[] | null;
   sent_at: string | null;
+  email_sent_at: string | null;
   status: string;
   error_message: string | null;
   created_by: string | null;
@@ -121,6 +125,7 @@ export function rowToDailyReport(row: ReportRow): DailyReport {
       : row.legacy_pdf_base64 || undefined,
     sentToEmails: row.sent_to_emails || [],
     sentAt: row.sent_at || "",
+    emailSentAt: row.email_sent_at || undefined,
     status: (row.status as DailyReport["status"]) || "SENT",
     errorMessage: row.error_message || undefined,
     createdBy: row.created_by || undefined,
@@ -133,6 +138,13 @@ export interface RowBuildExtras {
   pdfPath: string | null;
   status: DailyReport["status"];
   sentToEmails: string[];
+  /**
+   * Moment przyjęcia maila przez Resend. Pominięcie pola (undefined) NIE
+   * dopisuje kolumny do zapytania, więc przy ponownym upsercie tego samego
+   * raportu wcześniejsza data wysyłki zostaje nietknięta. `null` kasuje ją
+   * świadomie.
+   */
+  emailSentAt?: string | null;
   errorMessage?: string | null;
   createdBy?: string;
   createdByName?: string;
@@ -191,6 +203,7 @@ export function dailyReportToRow(report: DailyReport, extras: RowBuildExtras) {
     pdf_path: extras.pdfPath || null,
     sent_to_emails: extras.sentToEmails,
     sent_at: new Date().toISOString(),
+    ...(extras.emailSentAt !== undefined ? { email_sent_at: extras.emailSentAt } : {}),
     status: extras.status,
     error_message: extras.errorMessage ?? null,
     created_by: extras.createdBy ?? null,

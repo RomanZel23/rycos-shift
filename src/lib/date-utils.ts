@@ -72,6 +72,30 @@ export function formatPolishTime(isoOrTime?: string): string {
 }
 
 /**
+ * Formatuje timestamp do "DD.MM.YYYY, HH:mm" w strefie polskiej — bez sekund.
+ * Używane tam, gdzie liczy się data zdarzenia, a nie precyzja co do sekundy
+ * (np. godzina wysyłki maila w archiwum).
+ */
+export function formatPolishDateTimeShort(iso?: string | null): string {
+  if (!iso) return "";
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "";
+    return new Intl.DateTimeFormat("pl-PL", {
+      timeZone: POLAND_TIMEZONE,
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(d);
+  } catch {
+    return "";
+  }
+}
+
+/**
  * Formatuje pełny timestamp do formatu "DD.MM.YYYY, HH:mm:ss" w strefie polskiej
  */
 export function formatPolishDateTime(isoOrDate?: string | Date): string {

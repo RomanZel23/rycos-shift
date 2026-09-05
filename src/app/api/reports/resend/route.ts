@@ -136,12 +136,20 @@ export async function POST(req: NextRequest) {
     pdfBuffer
   );
 
+  // sent_at zostaje nietknięte — to moment złożenia raportu w terenie i ponowna
+  // wysyłka go nie zmienia. Wcześniej było tu nadpisywane, przez co raport po
+  // dosłaniu wyglądał, jakby powstał w chwili kliknięcia „Wyślij ponownie".
+  // Datę samej wysyłki trzyma teraz email_sent_at.
+  const resentAt = outcome.ok ? new Date().toISOString() : null;
+
   await supabase
     .from(REPORTS_TABLE)
     .update({
       status: outcome.ok ? "SENT" : "EMAIL_FAILED",
       sent_to_emails: outcome.ok ? outcome.recipients : [],
-      sent_at: new Date().toISOString(),
+      // Przy nieudanej próbie nie ruszamy kolumny: jeśli mail poszedł kiedyś
+      // wcześniej, ta data nadal jest prawdziwa.
+      ...(resentAt ? { email_sent_at: resentAt } : {}),
       error_message: outcome.ok ? null : outcome.message,
       ...(migratedPath ? { pdf_path: migratedPath, legacy_pdf_base64: null } : {}),
     })

@@ -70,7 +70,13 @@ export interface DailyReport {
   pdfFileName: string;
   pdfDataUrl?: string;
   sentToEmails: string[];
-  sentAt: string;
+  sentAt: string; // Kiedy pracownik złożył raport w terenie.
+  /**
+   * Kiedy Resend przyjął wiadomość. Puste = mail nigdy nie poszedł.
+   * Osobne od sentAt, bo raport dosłany po utracie łączności albo wysłany
+   * ponownie z Archiwum ma te dwie daty w innych momentach.
+   */
+  emailSentAt?: string;
   status: 'SENT' | 'EMAIL_FAILED' | 'SAVED_LOCAL' | 'FAILED';
   errorMessage?: string;
   // --- Pola wyłącznie lokalne (cache urządzenia). Nie mają kolumn w bazie

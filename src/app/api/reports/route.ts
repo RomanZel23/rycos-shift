@@ -146,6 +146,9 @@ export async function POST(req: NextRequest) {
   );
 
   const status: DailyReport["status"] = outcome.ok ? "SENT" : "EMAIL_FAILED";
+  // Znacznik stawiamy TYLKO przy udanej wysyłce. Dla nieudanej zostaje null,
+  // żeby „brak daty" jednoznacznie znaczyło „mail nie poszedł".
+  const emailSentAt = outcome.ok ? new Date().toISOString() : null;
 
   // 4. Zapis wiersza. Kształt buduje mapper — w bazie lądują wyłącznie
   // ścieżki w buckecie, czego pilnuje też CHECK na kolumnie pdf_path.
@@ -154,6 +157,7 @@ export async function POST(req: NextRequest) {
       pdfPath,
       status,
       sentToEmails: outcome.ok ? outcome.recipients : [],
+      emailSentAt,
       errorMessage: outcome.ok ? null : outcome.message,
       createdBy: authorId,
       createdByName: authorName,
@@ -172,6 +176,7 @@ export async function POST(req: NextRequest) {
     ...optimized,
     status,
     sentToEmails: outcome.ok ? outcome.recipients : [],
+    emailSentAt: emailSentAt || undefined,
     errorMessage: outcome.ok ? undefined : outcome.message,
   };
 

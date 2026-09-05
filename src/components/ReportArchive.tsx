@@ -20,11 +20,59 @@ import {
 } from "lucide-react";
 import { DailyReport, TenantSettings } from "@/types";
 import { sanitizePdfFileName } from "@/lib/pdf-generator";
-import { formatPolishTime } from "@/lib/date-utils";
+import { formatPolishTime, formatPolishDateTimeShort } from "@/lib/date-utils";
 import { findReportGaps, formatGapDate, missingLabel } from "@/lib/report-gaps";
 
 /** Dłuższa lista braków zamieniłaby ostrzeżenie w ścianę tekstu. */
 const MAX_VISIBLE_GAPS = 6;
+
+/**
+ * Status wysyłki wraz z godziną.
+ *
+ * Do tej pory w tym miejscu bezwarunkowo widniało „Wysłano e-mail", nawet dla
+ * raportu ze statusem EMAIL_FAILED albo dosłanego z urządzenia bez wysyłki.
+ * Archiwum zapewniało więc, że dokumentacja poszła, w dniach, w których nie
+ * poszła — a to jedyne miejsce, gdzie ktokolwiek to sprawdza.
+ */
+function DeliveryStatus({ report }: { report: DailyReport }) {
+  const wyslany = report.status === "SENT";
+  const kiedy = formatPolishDateTimeShort(report.emailSentAt);
+
+  if (!wyslany) {
+    const nieudana = report.status === "EMAIL_FAILED";
+    return (
+      <span
+        className={`inline-flex items-start gap-1 font-extrabold ${
+          nieudana ? "text-rose-600 dark:text-rose-400" : "text-amber-600 dark:text-amber-400"
+        }`}
+        title={report.errorMessage || undefined}
+      >
+        <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-px" />
+        <span>{nieudana ? "Mail nie wyszedł" : "Niedosłany na serwer"}</span>
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-start gap-1 font-extrabold text-emerald-600 dark:text-emerald-400">
+      <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0 mt-px" />
+      <span className="min-w-0">
+        <span className="block">Wysłano e-mail</span>
+        {kiedy ? (
+          <span className="block font-bold tabular-nums text-[11px] text-slate-500 dark:text-slate-400">
+            {kiedy}
+          </span>
+        ) : (
+          // Raporty sprzed migracji 0005 nie mają zapisanej godziny. Lepiej
+          // powiedzieć to wprost, niż podstawić datę złożenia raportu.
+          <span className="block font-bold text-[11px] text-slate-400 dark:text-slate-500">
+            godzina nieodnotowana
+          </span>
+        )}
+      </span>
+    </span>
+  );
+}
 
 interface ReportArchiveProps {
   reports: DailyReport[];
@@ -499,10 +547,7 @@ export function ReportArchive({
 
                   <div>
                     <span className="text-slate-400 font-bold block">Status wysyłki:</span>
-                    <span className="inline-flex items-center gap-1 font-extrabold text-emerald-600 dark:text-emerald-400">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>Wysłano e-mail</span>
-                    </span>
+                    <DeliveryStatus report={report} />
                   </div>
 
                   <div>
@@ -591,6 +636,32 @@ export function ReportArchive({
                   ) : (
                     <div className="font-mono text-xs text-slate-500">
                       Brak danych GPS
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <div className="text-xs text-slate-400">Wysyłka e-mail:</div>
+                  <div className="text-xs mt-0.5">
+                    <DeliveryStatus report={previewReport} />
+                  </div>
+                </div>
+                <div className="min-w-0">
+                  <div className="text-xs text-slate-400">Odbiorcy:</div>
+                  {previewReport.sentToEmails && previewReport.sentToEmails.length > 0 ? (
+                    <ul className="mt-0.5 space-y-0.5">
+                      {previewReport.sentToEmails.map((adres) => (
+                        <li
+                          key={adres}
+                          className="font-mono text-[11px] text-slate-600 dark:text-slate-300 truncate"
+                          title={adres}
+                        >
+                          {adres}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="text-xs text-slate-500 mt-0.5">
+                      Brak zapisanych odbiorców
                     </div>
                   )}
                 </div>
