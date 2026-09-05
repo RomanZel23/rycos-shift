@@ -9,12 +9,18 @@ import { GATE_COOKIE, gateFailure } from "@/lib/gate";
  * (funkcja `proxy`, domyślnie runtime Node.js).
  *
  * Wyjątki bez bramki:
- *   /api/gate — endpoint, który tę bramkę otwiera.
+ *   /api/gate   — endpoint, który tę bramkę otwiera,
+ *   /api/health — healthcheck Coolify / HEALTHCHECK w Dockerfile.
  */
+const PUBLIC_API_PATHS = ["/api/gate", "/api/health"];
+
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (pathname === "/api/gate" || pathname.startsWith("/api/gate/")) {
+  const isPublic = PUBLIC_API_PATHS.some(
+    (p) => pathname === p || pathname.startsWith(`${p}/`)
+  );
+  if (isPublic) {
     return NextResponse.next();
   }
 

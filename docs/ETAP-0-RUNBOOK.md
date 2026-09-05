@@ -59,9 +59,49 @@ RESEND_API_KEY=<nowy>
 RESEND_FROM_EMAIL=raporty@shift.rycos.eu
 ```
 
-### VPS
+### VPS przez Coolify — Build Pack: **Dockerfile** (aktualny sposób wdrożenia)
 
-Uzupełnij `.env` obok `docker-compose.yml` (te same klucze), potem:
+Zmienne ustawia się w **panelu Coolify → aplikacja → Environment Variables**,
+a nie w pliku `.env` z repo — Coolify wstrzykuje własne. Plik `.env` na serwerze
+przydaje się tylko przy ręcznym `docker compose up` z pominięciem Coolify.
+
+Ponieważ build idzie z Dockerfile, **`docker-compose.yml` nie jest w ogóle
+używany** — jego `build.args` i sekcja `environment` nie mają wpływu na produkcję.
+Jedynym kanałem dla `ARG NEXT_PUBLIC_*` w Dockerfile są Build Variables z panelu.
+
+| Zmienna | Build Variable? | Uwagi |
+|---|---|---|
+| `APP_ACCESS_CODE` | nie | Bez niej API zwraca 503. |
+| `GATE_SECRET` | nie | `openssl rand -hex 32`. |
+| `SUPABASE_SERVICE_ROLE_KEY` | **nie** | Runtime only — jako build arg zostałby w warstwie obrazu. |
+| `RESEND_API_KEY` | **nie** | j.w. |
+| `RESEND_FROM_EMAIL` | nie | |
+| `NEXT_PUBLIC_SUPABASE_URL` | **tak** | Inline'owana do bundla podczas `pnpm build`. |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | **tak** | j.w. |
+
+Pułapka numer jeden: **`NEXT_PUBLIC_*` bez zaznaczonego „Build Variable"**
+przechodzą tylko jako runtime env. Next inline'uje je w czasie builda, więc
+w przeglądarce wyjdą `undefined` i aplikacja zachowa się jak niepodłączona do
+Supabase — pusta lista pracowników na ekranie logowania to pierwszy objaw.
+
+Po ustawieniu zmiennych: **Redeploy**, nie restart. Restart nie przebuduje bundla,
+więc zmiana `NEXT_PUBLIC_*` bez redeploya nic nie da.
+
+**Healthcheck.** Obraz ma `HEALTHCHECK` bijący w `/api/health` — endpoint jest
+poza bramką, więc odpowiada bez kodu dostępu i nie zdradza niczego poza tym,
+czy `APP_ACCESS_CODE` i konfiguracja Supabase w ogóle istnieją:
+
+```bash
+curl -s https://<domena>/api/health
+# {"status":"ok","config":{"gate":true,"supabase":true}}
+```
+
+`"gate": false` na produkcji = brak `APP_ACCESS_CODE`, całe API zwraca 503.
+`"supabase": false` = brak URL-a albo `SUPABASE_SERVICE_ROLE_KEY`.
+
+### VPS ręcznie (bez Coolify)
+
+Uzupełnij `.env` obok `docker-compose.yml`, potem:
 
 ```bash
 docker compose up -d --build
