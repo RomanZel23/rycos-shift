@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Browser } from "puppeteer-core";
 import puppeteer from "puppeteer-core";
+import { COMPANY, companyContactLine, companyRegistryLine } from "./brand";
 
 /**
  * Etap 3 — renderowanie PDF po stronie serwera przez Chromium.
@@ -139,12 +140,33 @@ export class BrowserLaunchError extends Error {
   }
 }
 
+/**
+ * Stopka odwzorowuje papier firmowy (docs/logo/company_layout.pdf): trzy linie
+ * danych rejestrowych drobnym szarym drukiem, wyrównane do lewej. Numeracja
+ * stron idzie po prawej, w tej samej linii co nazwa dokumentu.
+ *
+ * Stopka jest osobnym dokumentem renderowanym przez Chromium — nie widzi CSS
+ * strony i nie pobierze żadnego pliku, więc style są wpisane wprost, a kroje
+ * ograniczone do tych, które są w obrazie Dockera.
+ */
 function footerTemplate(reportName: string): string {
+  const esc = (s: string) =>
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
   return `
-    <div style="width:100%; padding:0 11mm; font-family: 'Liberation Sans', Arial, sans-serif;
-                font-size:7pt; color:#64748b; display:flex; justify-content:space-between;">
-      <span>${reportName}</span>
-      <span>Strona <span class="pageNumber"></span> z <span class="totalPages"></span></span>
+    <div style="width:100%; padding:0 11mm; box-sizing:border-box;
+                font-family:'Liberation Sans', Arial, sans-serif; color:#64748b;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:8mm;">
+        <div style="font-size:5.5pt; line-height:1.45; text-align:left;">
+          <div>${esc(COMPANY.legalName)}</div>
+          <div>${esc(companyRegistryLine())}</div>
+          <div>${esc(companyContactLine())}</div>
+        </div>
+        <div style="font-size:6pt; white-space:nowrap; text-align:right; line-height:1.45;">
+          <div>${esc(reportName)}</div>
+          <div>Strona <span class="pageNumber"></span> z <span class="totalPages"></span></div>
+        </div>
+      </div>
     </div>
   `;
 }

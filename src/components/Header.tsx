@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { BrandLogo } from "./BrandLogo";
 import {
   FileText,
   Camera,
@@ -52,17 +53,12 @@ export function Header({
   return (
     <header className="sticky top-0 z-40 bg-slate-900 border-b border-slate-800 text-white shadow-xl">
       <div className="max-w-6xl mx-auto px-4 sm:px-6">
-        <div className="flex items-center justify-between h-18 sm:h-22">
+        <div className="flex items-center justify-between min-h-18 sm:min-h-22 py-2 gap-3">{/* min-h zamiast h: przy dłuższej nazwie firmy treść była wyższa niż sztywne 88px i „RYCOS Shift" ucinało się u góry i u dołu. */}
           {/* LOGOTYP & BRANDING (iDream / SolutionsBay) */}
           <div className="flex items-center gap-3.5">
-            {/* Sygnet SolutionsBay */}
-            <div className="w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-gradient-to-tr from-sky-600 via-blue-600 to-indigo-600 flex items-center justify-center font-black text-white text-xl sm:text-2xl shadow-lg shadow-sky-500/25 border-2 border-white/20 flex-shrink-0">
-              <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
-                <polygon points="16,2 6,12 16,22 26,12" fill="#ffffff" />
-                <polygon points="6,12 16,22 16,30" fill="#f97316" />
-                <polygon points="26,12 16,22 16,30" fill="#ef4444" />
-                <polygon points="16,2 26,12 16,22" fill="#38bdf8" />
-              </svg>
+            {/* Prawdziwy sygnet SolutionsBay — patrz src/lib/brand.ts */}
+            <div className="w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-white/95 dark:bg-white/95 flex items-center justify-center shadow-lg shadow-sky-900/30 border border-white/30 flex-shrink-0 p-2.5">
+              <BrandLogo kind="mark" variant="light" className="w-full h-full" />
             </div>
             <div>
               <div className="flex items-center gap-2">

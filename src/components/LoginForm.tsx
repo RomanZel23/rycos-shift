@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
+import { BrandLogo } from "./BrandLogo";
 import { User as UserType, TenantSettings } from "@/types";
 import {
   Lock,
@@ -125,17 +126,8 @@ export function LoginForm({ settings, onLogin }: LoginFormProps) {
 
             <div className="w-px h-7 bg-slate-800 mx-1"></div>
 
-            <div className="flex items-center gap-2">
-              <svg width="22" height="22" viewBox="0 0 32 32" fill="none">
-                <polygon points="16,2 6,12 16,22 26,12" fill="#0284c7" />
-                <polygon points="6,12 16,22 16,30" fill="#f97316" />
-                <polygon points="26,12 16,22 16,30" fill="#ef4444" />
-                <polygon points="16,2 26,12 16,22" fill="#38bdf8" />
-              </svg>
-              <span className="text-lg font-black tracking-tight text-white">
-                Solutions<span className="text-sky-400">Bay</span>
-              </span>
-            </div>
+            {/* Prawdziwe logo SolutionsBay w wariancie na ciemne tło */}
+            <BrandLogo kind="full" variant="dark" width={152} />
           </div>
 
           <div>

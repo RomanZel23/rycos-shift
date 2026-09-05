@@ -1,4 +1,4 @@
-import { DailyReport, TenantSettings } from "@/types";
+import type { DailyReport, TenantSettings } from "@/types";
 import { formatPolishTime } from "./date-utils";
 
 /**
@@ -25,17 +25,11 @@ import { formatPolishTime } from "./date-utils";
  * systemu użytkownika — to ich metryki psuły poprzedni układ.
  */
 
+import { COMPANY, fullLogoSvg } from "./brand";
+
 const FONT_STACK = "'Liberation Sans', 'DejaVu Sans', Arial, Helvetica, sans-serif";
 const FONT_MONO = "'DejaVu Sans Mono', 'Liberation Mono', monospace";
 
-const SB_LOGO_INLINE_SVG = `
-  <svg width="26" height="26" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <polygon points="16,2 6,12 16,22 26,12" fill="#0284c7" />
-    <polygon points="6,12 16,22 16,30" fill="#f97316" />
-    <polygon points="26,12 16,22 16,30" fill="#ef4444" />
-    <polygon points="16,2 26,12 16,22" fill="#38bdf8" />
-  </svg>
-`;
 
 export function escapeHtml(str?: string): string {
   return String(str ?? "")
@@ -50,8 +44,9 @@ function baseStyles(): string {
   return `
     @page {
       size: A4;
-      /* Dolny margines zostawia miejsce na stopkę z numeracją stron. */
-      margin: 12mm 11mm 16mm 11mm;
+      /* Dolny margines mieści trzylinijkową stopkę z danymi rejestrowymi
+         (jak na papierze firmowym) plus numerację stron. */
+      margin: 12mm 11mm 22mm 11mm;
     }
 
     * { box-sizing: border-box; }
@@ -75,7 +70,10 @@ function baseStyles(): string {
       padding-bottom: 10px;
       margin-bottom: 14px;
     }
-    .letterhead img { height: 34px; width: auto; display: block; }
+    .letterhead img { height: 40px; width: auto; display: block; }
+    /* Proporcja znaku to 648:111, więc 150px szerokości daje ok. 26px wysokości. */
+    .letterhead .sb-logo { width: 150px; }
+    .letterhead .sb-logo svg { width: 100%; height: auto; display: block; }
 
     .title-bar {
       display: flex;
@@ -267,18 +265,22 @@ function baseStyles(): string {
   `;
 }
 
+/**
+ * Nagłówek odwzorowuje papier firmowy (docs/logo/company_layout.pdf):
+ * iDream Business Center z lewej, SolutionsBay z prawej. Oba znaki są
+ * prawdziwe — logo SolutionsBay wstawiamy jako SVG wprost z src/lib/brand.ts,
+ * więc jest wektorowe i nie zależy od pobrania pliku (Chromium renderujący
+ * dokument ma zablokowaną sieć).
+ */
 function renderLetterhead(logoDataUrl?: string): string {
   return `
     <div class="letterhead">
       ${
         logoDataUrl
           ? `<img src="${escapeHtml(logoDataUrl)}" alt="iDream Business Center" />`
-          : `<span style="font-size:17px;font-weight:800;color:#0284c7;">iDream</span>`
+          : `<span style="font-size:17px;font-weight:800;color:#002c47;">iDream Business Center</span>`
       }
-      <div style="display: flex; align-items: center; gap: 7px;">
-        ${SB_LOGO_INLINE_SVG}
-        <span style="font-size: 15px; font-weight: 800;">Solutions<span style="color:#0284c7;">Bay</span></span>
-      </div>
+      <div class="sb-logo">${fullLogoSvg("light")}</div>
     </div>
   `;
 }
@@ -326,7 +328,7 @@ function renderMeta(report: DailyReport): string {
 }
 
 function renderClosing(settings?: TenantSettings): string {
-  const org = settings?.organizationName || "iDream Business Center / SolutionsBay Sp. z o.o.";
+  const org = settings?.organizationName || COMPANY.legalName;
   return `
     <div class="closing">
       <div class="formula">[Koniec raportu]</div>
