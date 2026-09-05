@@ -14,15 +14,15 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Tylko zmienne NEXT_PUBLIC_* — te są inline'owane do bundla i muszą być znane
+# w czasie builda. Sekrety serwerowe (SUPABASE_SERVICE_ROLE_KEY, RESEND_API_KEY)
+# celowo NIE są build argami: zostałyby na stałe w warstwie obrazu.
+# Przekazuje się je wyłącznie jako zmienne środowiskowe kontenera.
 ARG NEXT_PUBLIC_SUPABASE_URL
 ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
-ARG SUPABASE_SERVICE_ROLE_KEY
-ARG RESEND_API_KEY
 
 ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
 ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
-ENV SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY
-ENV RESEND_API_KEY=$RESEND_API_KEY
 
 RUN pnpm build
 

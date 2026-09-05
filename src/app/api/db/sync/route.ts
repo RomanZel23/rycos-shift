@@ -1,7 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseClient, isSupabaseConfigured } from "@/lib/supabase";
-import { User, ConstructionSite, DiscussedTopicTemplate, TenantSettings, DailyReport, PdfTemplate } from "@/types";
-import { optimizeReportForStorage, BUCKET_NAME } from "@/lib/supabase-storage";
+import {
+  User,
+  ConstructionSite,
+  DiscussedTopicTemplate,
+  TenantSettings,
+  DailyReport,
+  PdfTemplate,
+  AttendanceRecord,
+  PhotoDocumentationItem,
+} from "@/types";
+import { optimizeReportForStorage } from "@/lib/supabase-storage";
+import { normalizeStoredFileRef } from "@/lib/storage-paths";
 
 export async function GET() {
   try {
@@ -70,7 +80,9 @@ export async function GET() {
       };
     }
 
-    // Mapowanie raportów
+    // Mapowanie raportów.
+    // Etap 0: bucket jest już prywatny, więc historyczne publiczne URL-e CDN
+    // przepisujemy na adresy same-origin /api/files?path=...
     const reports: DailyReport[] = (reportsRes.data || []).map((row) => ({
       id: row.id,
       tenantId: row.tenant_id,
@@ -83,10 +95,18 @@ export async function GET() {
       foremanName: row.foreman_name,
       location: row.location || {},
       discussedTopics: row.discussed_topics || [],
-      attendanceList: row.attendance_list || [],
-      photoDocumentation: row.photo_documentation || [],
+      attendanceList: (row.attendance_list || []).map((att: AttendanceRecord) => ({
+        ...att,
+        signatureDataUrl: normalizeStoredFileRef(att?.signatureDataUrl),
+      })),
+      photoDocumentation: (row.photo_documentation || []).map(
+        (photo: PhotoDocumentationItem) => ({
+          ...photo,
+          photoDataUrl: normalizeStoredFileRef(photo?.photoDataUrl),
+        })
+      ),
       pdfFileName: row.pdf_file_name,
-      pdfDataUrl: row.pdf_data_url,
+      pdfDataUrl: normalizeStoredFileRef(row.pdf_data_url),
       sentToEmails: row.sent_to_emails || [],
       sentAt: row.sent_at,
       status: row.status,

@@ -1,0 +1,109 @@
+# Etap 0 — runbook wdrożenia
+
+Kolejność ma znaczenie: najpierw sekrety, potem baza, potem deploy.
+Między krokiem 2 a 4 aplikacja **nie będzie działać** (bucket prywatny, a stary
+kod jeszcze o tym nie wie) — planuj to poza godzinami pracy brygad.
+
+---
+
+## 1. Rotacja sekretów (ręcznie, w panelach)
+
+Zakładamy, że wszystko, co było dostępne przez otwarte API, wyciekło.
+
+| Sekret | Gdzie | Uwagi |
+|---|---|---|
+| `RESEND_API_KEY` | resend.com → API Keys | Skasuj stary klucz, nie tylko dodaj nowy. Stary krążył w localStorage telefonów. |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Settings → API Keys | Rotacja unieważnia stary klucz wszędzie. |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | tamże | Po migracji SQL i tak nic nie daje, ale rotujemy dla porządku. |
+| Hasła użytkowników | tabela `public.users` | Etap 1 wymieni je na Supabase Auth. Do tego czasu bramka `APP_ACCESS_CODE` jest jedyną realną ochroną. |
+
+Wygeneruj też dwie nowe wartości:
+
+```bash
+openssl rand -hex 32   # GATE_SECRET
+openssl rand -base64 9 # APP_ACCESS_CODE (albo własny, łatwy do podyktowania)
+```
+
+## 2. Przegląd logów pod kątem nadużyć
+
+- **Resend → Logs**: czy z `raporty@shift.rycos.eu` poszło coś na adresy spoza listy odbiorców.
+- **Supabase → Logs → API / Storage**: nietypowe wolumeny `GET /rest/v1/users`
+  albo pobrania z `storage/v1/object/public/rycos-reports/`.
+
+Jeśli coś wygląda podejrzanie: raporty zawierają dane osobowe i podpisy,
+więc trzeba rozważyć zgłoszenie naruszenia (72 h od stwierdzenia).
+
+## 3. Migracja SQL
+
+Supabase → SQL Editor → wklej i uruchom:
+
+```
+supabase/migrations/0001_etap0_lockdown.sql
+```
+
+Następnie uruchom trzy zapytania weryfikacyjne z sekcji „WERYFIKACJA" na końcu pliku.
+Oczekiwane wyniki: brak polityk `qual = true`, `public = false` na buckecie,
+zero grantów dla roli `anon`.
+
+## 4. Zmienne środowiskowe
+
+### Vercel → Settings → Environment Variables
+
+```
+APP_ACCESS_CODE=<kod dla brygad>
+GATE_SECRET=<openssl rand -hex 32>
+SUPABASE_SERVICE_ROLE_KEY=<nowy>
+NEXT_PUBLIC_SUPABASE_URL=https://<projekt>.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<nowy>
+RESEND_API_KEY=<nowy>
+RESEND_FROM_EMAIL=raporty@shift.rycos.eu
+```
+
+### VPS
+
+Uzupełnij `.env` obok `docker-compose.yml` (te same klucze), potem:
+
+```bash
+docker compose up -d --build
+```
+
+`docker-compose.yml` ma teraz twarde wymagania — brak `APP_ACCESS_CODE`
+lub `SUPABASE_SERVICE_ROLE_KEY` zatrzyma start z czytelnym komunikatem
+zamiast wystawiać otwarte API.
+
+## 5. Deploy i test dymny
+
+1. Otwórz aplikację w trybie prywatnym → powinien pojawić się ekran **„Autoryzacja urządzenia"**.
+2. Wpisz `APP_ACCESS_CODE` → przechodzisz do logowania.
+3. Zaloguj się, wejdź w **Archiwum** → miniatury zdjęć i podpisy z historycznych
+   raportów muszą się załadować (idą teraz przez `/api/files`).
+4. Pobierz PDF z archiwum → plik ma się wygenerować bez pustych ramek na podpisy.
+5. Z innej przeglądarki, bez kodu:
+   ```bash
+   curl -i https://<domena>/api/db/sync
+   ```
+   Oczekiwane: `401` i `"code":"GATE_LOCKED"`.
+6. Sprawdź, że publiczny URL Storage już nie działa:
+   ```bash
+   curl -i https://<projekt>.supabase.co/storage/v1/object/public/rycos-reports/pdf/<dowolny>.pdf
+   ```
+   Oczekiwane: `400`/`404`, nie `200`.
+
+## 6. Dystrybucja kodu do zespołu
+
+Kod podaje się raz na telefon, ciasteczko żyje 30 dni. Przy zgubionym urządzeniu:
+zmień `APP_ACCESS_CODE` **i** `GATE_SECRET` → wszystkie urządzenia proszą o kod ponownie.
+
+---
+
+## Czego Etap 0 NIE naprawia
+
+Świadomie, żeby diff dało się przejrzeć:
+
+- Logowanie pracownika nadal jest weryfikowane po stronie klienta i wciąż działają
+  hasła `admin` / `1234` / `password123`. **Bramka chroni przed internetem, nie przed
+  kimś, kto zna kod dostępu.** To Etap 1.
+- `/api/send-report` nadal przyjmuje `recipients` i `apiKey` z body — ale jest już
+  za bramką, więc nie jest otwartym relayem dla całego świata. To Etap 2.
+- Raporty wciąż jeżdżą jako base64 i wciąż mówią „wysłano" przy błędzie wysyłki. Etap 2.
+- Hasła w tabeli `users` nadal plaintext. Etap 1.

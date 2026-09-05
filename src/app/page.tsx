@@ -7,6 +7,7 @@ import { EndShiftForm } from "@/components/EndShiftForm";
 import { ReportArchive } from "@/components/ReportArchive";
 import { AdminSettings } from "@/components/AdminSettings";
 import { LoginForm } from "@/components/LoginForm";
+import { AccessGate } from "@/components/AccessGate";
 import { PwaInstallPrompt } from "@/components/PwaInstallPrompt";
 import {
   User,
@@ -52,11 +53,26 @@ export default function Home() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isSupabaseConnected, setIsSupabaseConnected] = useState(true);
 
+  // Etap 0: bramka dostępu do API (autoryzacja urządzenia kodem)
+  const [isGateChecked, setIsGateChecked] = useState(false);
+  const [isGateLocked, setIsGateLocked] = useState(false);
+
   // Funkcja pobierania najświeższych danych bezpośrednio z bazy danych Supabase
   const syncWithDatabase = useCallback(async () => {
     try {
       setIsSyncing(true);
       const res = await fetch("/api/db/sync");
+
+      // Bramka Etapu 0 odrzuciła urządzenie — pokaż ekran kodu dostępu
+      if (res.status === 401 || res.status === 503) {
+        const body = await res.json().catch(() => null);
+        if (body?.code === "GATE_LOCKED" || body?.code === "GATE_NOT_CONFIGURED") {
+          setIsGateLocked(true);
+          setIsGateChecked(true);
+          return;
+        }
+      }
+
       const resJson = await res.json();
       if (resJson.success && resJson.isConnected && resJson.data) {
         setIsSupabaseConnected(true);
@@ -143,6 +159,31 @@ export default function Home() {
     if (newTab === "ARCHIVE") {
       syncWithDatabase();
     }
+  }, [syncWithDatabase]);
+
+  // Etap 0: sprawdzenie bramki przed pierwszym odpytaniem API
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/gate")
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        setIsGateLocked(Boolean(data?.required) && !data?.unlocked);
+      })
+      .catch(() => {
+        // Offline — nie blokuj aplikacji, dane z cache localStorage nadal działają
+      })
+      .finally(() => {
+        if (!cancelled) setIsGateChecked(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleGateUnlocked = useCallback(() => {
+    setIsGateLocked(false);
+    syncWithDatabase();
   }, [syncWithDatabase]);
 
   // Inicjalizacja z localStorage i synchronizacja w tle przy starcie
@@ -259,6 +300,11 @@ export default function Home() {
       console.warn("Błąd sieciowy podczas zapisu raportu do Supabase:", err);
     }
   };
+
+  // ETAP 0: URZĄDZENIE BEZ AUTORYZACJI -> EKRAN KODU DOSTĘPU PRZED LOGOWANIEM
+  if (isGateChecked && isGateLocked) {
+    return <AccessGate onUnlocked={handleGateUnlocked} />;
+  }
 
   // JEŚLI UŻYTKOWNIK NIE JEST ZALOGOWANY -> POKAŻ OD RAZU EKRAN LOGOWANIA
   if (!currentUser) {

@@ -3,3 +3,18 @@ node_modules
 .git
 .gitignore
 README.md
+
+# Sekrety — nigdy nie mogą trafić do warstwy obrazu
+.env
+.env.*
+!.env.example
+keys.txt
+*.pem
+
+# Ciężkie / niepotrzebne w buildzie
+.pnpm-store
+docs
+.vercel
+coverage
+*.tsbuildinfo
+.DS_Store

@@ -3,13 +3,25 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      # Zmienne NEXT_PUBLIC_* muszą być znane w czasie builda (są inline'owane w bundlu)
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
     container_name: rycos-shift-app
     restart: unless-stopped
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=production
+      # Etap 0 — bramka dostępu. Bez APP_ACCESS_CODE API zwraca 503.
+      - APP_ACCESS_CODE=${APP_ACCESS_CODE:?APP_ACCESS_CODE jest wymagany}
+      - GATE_SECRET=${GATE_SECRET:-}
+      # Resend
       - RESEND_API_KEY=${RESEND_API_KEY}
-      - RESEND_FROM_EMAIL=${RESEND_FROM_EMAIL:-raporty@solutionsbay.pl}
+      - RESEND_FROM_EMAIL=${RESEND_FROM_EMAIL:-raporty@shift.rycos.eu}
+      # Supabase — service_role tylko runtime, nigdy jako build arg
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY:?SUPABASE_SERVICE_ROLE_KEY jest wymagany}
     volumes:
       - ./data:/app/data

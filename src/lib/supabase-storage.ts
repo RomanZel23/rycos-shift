@@ -1,7 +1,8 @@
 import { getSupabaseClient } from "./supabase";
 import { DailyReport, AttendanceRecord, PhotoDocumentationItem } from "@/types";
+import { BUCKET_NAME, toAppFileUrl } from "./storage-paths";
 
-export const BUCKET_NAME = "rycos-reports";
+export { BUCKET_NAME };
 
 /**
  * Konwertuje string Base64 Data URL na Buffer / Uint8Array
@@ -36,8 +37,9 @@ function base64ToUint8Array(base64Data: string): { data: Uint8Array; contentType
 }
 
 /**
- * Wysyła plik Base64 (zdjęcie, podpis, PDF) bezpośrednio do bucketu Supabase Storage.
- * Zwraca bezpośredni publiczny adres URL CDN.
+ * Wysyła plik Base64 (zdjęcie, podpis, PDF) do prywatnego bucketu Supabase Storage.
+ * Zwraca adres same-origin /api/files?path=... — bucket od Etapu 0 nie jest publiczny,
+ * więc pliki serwuje aplikacja, za bramką dostępu.
  */
 export async function uploadBase64ToStorage(
   base64Data: string,
@@ -45,8 +47,8 @@ export async function uploadBase64ToStorage(
   forcedContentType?: string
 ): Promise<string | null> {
   try {
-    // Jeśli to już jest URL http/https (np. już w buckecie), nie wysyłaj ponownie
-    if (base64Data.startsWith("http://") || base64Data.startsWith("https://")) {
+    // Cokolwiek, co nie jest data URL-em, jest już odwołaniem do pliku — nie wysyłaj ponownie
+    if (!base64Data.startsWith("data:")) {
       return base64Data;
     }
 
@@ -66,8 +68,7 @@ export async function uploadBase64ToStorage(
       return null;
     }
 
-    const { data: urlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filePath);
-    return urlData.publicUrl;
+    return toAppFileUrl(filePath);
   } catch (err) {
     console.warn(`Supabase Storage upload exception for ${filePath}:`, err);
     return null;
@@ -79,7 +80,7 @@ export async function uploadBase64ToStorage(
  * - Wrzuca plik PDF do bucketu (folder `pdf/`)
  * - Wrzuca zdjęcia fotorelacji do bucketu (folder `photos/`)
  * - Wrzuca podpisy pracowników do bucketu (folder `signatures/`)
- * - Zwraca raport z lekkimi adresami URL CDN zamiast gigantycznych ciągów Base64.
+ * - Zwraca raport z lekkimi adresami /api/files?path=... zamiast gigantycznych ciągów Base64.
  */
 export async function optimizeReportForStorage(report: DailyReport): Promise<DailyReport> {
   const optimized: DailyReport = { ...report };
