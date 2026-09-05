@@ -89,17 +89,37 @@ function renderCorporateFooter(settings?: TenantSettings): string {
   `;
 }
 
+/**
+ * Skraca opis do budżetu znaków mieszczącego się w dwóch wierszach karty.
+ *
+ * Konieczne, bo html2canvas nie implementuje -webkit-line-clamp — na ekranie
+ * opis wyglądał na przycięty do dwóch linii, a w PDF-ie renderował się w pełnej
+ * wysokości i był siekany w połowie liter przez overflow rodzica.
+ */
+function clampDescription(text: string, maxChars = 74): string {
+  const clean = (text || "").replace(/\s+/g, " ").trim();
+  if (clean.length <= maxChars) return clean;
+  const cut = clean.slice(0, maxChars);
+  const lastSpace = cut.lastIndexOf(" ");
+  return (lastSpace > maxChars * 0.6 ? cut.slice(0, lastSpace) : cut).trimEnd() + "…";
+}
+
 function renderPhotoCard(photo: { photoDataUrl?: string; description?: string; takenAt?: string }, idx: number): string {
+  const description = clampDescription(
+    photo.description || "Dokumentacja stanu robót na placu budowy."
+  );
   return `
     <div style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; height: 265px; box-sizing: border-box;">
       <div style="height: 195px; background-color: #0f172a; display: flex; align-items: center; justify-content: center; overflow: hidden;">
         <img src="${photo.photoDataUrl || ""}" alt="Fotografia ${idx + 1}" style="width: 100%; height: 100%; object-fit: cover; display: block;" />
       </div>
-      <div style="padding: 8px 12px; flex: 1; display: flex; flex-direction: column; justify-content: space-between; background-color: #ffffff;">
-        <div style="font-size: 11px; font-weight: 700; color: #1e293b; line-height: 1.35; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
-          ${escapeHtml(photo.description || "Dokumentacja stanu robót na placu budowy.")}
+      <div style="padding: 8px 12px; height: 70px; box-sizing: border-box; background-color: #ffffff;">
+        <!-- Sztywne 30px = dokładnie dwa wiersze po 15px. html2canvas nie zna
+             line-clamp, więc wysokość musi być policzona, a nie sugerowana. -->
+        <div style="font-size: 11px; font-weight: 700; color: #1e293b; line-height: 15px; height: 30px; overflow: hidden; word-break: break-word;">
+          ${escapeHtml(description)}
         </div>
-        <div style="font-size: 9px; color: #64748b; font-family: monospace; margin-top: 4px;">
+        <div style="font-size: 9px; color: #64748b; font-family: monospace; margin-top: 6px; line-height: 12px; height: 12px; overflow: hidden;">
           Wykonano: ${formatPolishTime(photo.takenAt || "")}
         </div>
       </div>
