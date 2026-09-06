@@ -55,3 +55,27 @@ export function sanitizePdfFileName(name: string): string {
   }
   return clean;
 }
+
+/**
+ * Fragment nazwy pliku zrobiony z dowolnego tekstu — nazwy placu budowy,
+ * nazwiska, czegokolwiek.
+ *
+ * Powstało, bo nazwa pliku wychodziła jako
+ *   „…_Nastawnia_PKP_Pozna_-_Pi_tkowo.pdf"
+ * zamiast „…_Nastawnia_PKP_Poznan_-_Piatkowo.pdf". Nazwa przechodziła przez
+ * dwa sanityzatory: pierwszy wycinał wszystko spoza [a-zA-Z0-9_-] na
+ * podkreślenia, więc do drugiego — tego, który umie przepisać „ń" na „n" —
+ * docierało już samo „_". Kolejność ma znaczenie: NAJPIERW diakrytyki,
+ * potem dopiero czyszczenie.
+ */
+export function slugifyForFileName(text: string, fallback = "x"): string {
+  const czysty = removePolishDiacritics(text || "")
+    // Wszystko, co nie jest literą, cyfrą, podkreśleniem ani myślnikiem, staje
+    // się podkreśleniem — a nie znika. Inaczej „Gdańsk/Oliwa" sklejałoby się
+    // w „GdanskOliwa".
+    .replace(/[^a-zA-Z0-9_-]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/-+/g, "-")
+    .replace(/^[._-]+|[._-]+$/g, "");
+  return czysty || fallback;
+}

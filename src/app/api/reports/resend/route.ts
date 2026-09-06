@@ -4,6 +4,7 @@ import { requireUser, withRefreshedSession } from "@/lib/auth";
 import { BUCKET_NAME } from "@/lib/storage-paths";
 import { REPORTS_TABLE } from "@/lib/report-mapper";
 import { resolveEmailConfig, sendReportEmail } from "@/lib/email";
+import { slugifyForFileName } from "@/lib/pdf-generator";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -83,7 +84,7 @@ export async function POST(req: NextRequest) {
     pdfBuffer = Buffer.from(base64, "base64");
 
     const dateStr = String(row.report_date || "").replace(/[^0-9-]/g, "");
-    const siteSlug = (row.site_name || "plac").replace(/[^a-zA-Z0-9_-]/g, "_");
+    const siteSlug = slugifyForFileName(row.site_name, "plac");
     const legacyPath = `pdf/${dateStr}_${row.report_type}_${siteSlug}_${row.id}.pdf`;
     const { error: upErr } = await supabase.storage
       .from(BUCKET_NAME)

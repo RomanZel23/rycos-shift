@@ -1,7 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { newId, newPrefixedId } from "@/lib/ids";
-import { removePolishDiacritics, sanitizePdfFileName } from "@/lib/pdf-generator";
+import {
+  removePolishDiacritics,
+  sanitizePdfFileName,
+  slugifyForFileName,
+} from "@/lib/pdf-generator";
 
 test("identyfikatory nie kolidują w obrębie jednej milisekundy", () => {
   // Dokładnie ten przypadek psuł stare `"rep-end-" + Date.now()`: dwa raporty
@@ -48,4 +52,47 @@ test("nazwa pliku nie przemyca ścieżki", () => {
 test("nazwa złożona z samych odrzuconych znaków nie daje pustego pliku", () => {
   assert.equal(sanitizePdfFileName("///"), "Raport.pdf");
   assert.equal(sanitizePdfFileName("..."), "Raport.pdf");
+});
+
+/**
+ * Regresja z 2026-09-06: w mailu przyszedł załącznik o nazwie
+ * „…_Nastawnia_PKP_Pozna_-_Pi_tkowo.pdf". Nazwa placu przechodziła przez dwa
+ * sanityzatory i pierwszy zamieniał polskie znaki na podkreślenia, zanim drugi
+ * zdążył je przepisać na odpowiedniki łacińskie.
+ */
+test("nazwa placu zachowuje polskie znaki jako odpowiedniki łacińskie", () => {
+  assert.equal(
+    slugifyForFileName("Nastawnia PKP Poznań - Piątkowo", "plac"),
+    "Nastawnia_PKP_Poznan_-_Piatkowo"
+  );
+  assert.equal(slugifyForFileName("Łódź Widzew", "plac"), "Lodz_Widzew");
+  assert.equal(slugifyForFileName("Świnoujście", "plac"), "Swinoujscie");
+});
+
+test("cała nazwa pliku raportu jest czytelna", () => {
+  const slug = slugifyForFileName("Nastawnia PKP Poznań - Piątkowo", "plac");
+  assert.equal(
+    sanitizePdfFileName(`2026-09-06_Zakonczenie_prac_zespolu_${slug}`),
+    "2026-09-06_Zakonczenie_prac_zespolu_Nastawnia_PKP_Poznan_-_Piatkowo.pdf"
+  );
+  assert.ok(!sanitizePdfFileName(`x_${slug}`).includes("__"), "podwójne podkreślenia");
+});
+
+test("separatory nie sklejają słów", () => {
+  // Ukośnik i myślnik długi mają rozdzielać, a nie znikać.
+  assert.equal(slugifyForFileName("Gdańsk/Oliwa", "plac"), "Gdansk_Oliwa");
+  assert.equal(slugifyForFileName("Świnoujście — Ostrów", "plac"), "Swinoujscie_Ostrow");
+});
+
+test("pusta lub bezużyteczna nazwa placu daje wartość zastępczą", () => {
+  for (const wejscie of ["", "   ", "!!!", "///"]) {
+    assert.equal(slugifyForFileName(wejscie, "plac"), "plac", JSON.stringify(wejscie));
+  }
+});
+
+test("slug nie zaczyna się ani nie kończy separatorem", () => {
+  for (const wejscie of ["  Poznań  ", "-Poznań-", "_Poznań_", ".Poznań."]) {
+    const s = slugifyForFileName(wejscie, "plac");
+    assert.ok(!/^[._-]|[._-]$/.test(s), `${JSON.stringify(wejscie)} -> ${s}`);
+  }
 });

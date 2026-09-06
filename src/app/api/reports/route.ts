@@ -7,7 +7,7 @@ import { generateEndShiftHtml, generateStartShiftHtml } from "@/lib/pdf-html-tem
 import { renderHtmlToPdf, BrowserLaunchError } from "@/lib/pdf-renderer";
 import { loadExoFontFaceCss, loadLogoDataUrl, mediaAsDataUrls } from "@/lib/pdf-assets";
 import { resolveEmailConfig, sendReportEmail } from "@/lib/email";
-import { sanitizePdfFileName } from "@/lib/pdf-generator";
+import { sanitizePdfFileName, slugifyForFileName } from "@/lib/pdf-generator";
 import { DailyReport } from "@/types";
 import { REPORTS_TABLE, dailyReportToRow } from "@/lib/report-mapper";
 
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
   const authorName = `${auth.context.user.firstName} ${auth.context.user.lastName}`.trim();
 
   const dateStr = (report.date || "").replace(/[^0-9-]/g, "");
-  const siteSlug = (report.siteName || "plac").replace(/[^a-zA-Z0-9_-]/g, "_");
+  const siteSlug = slugifyForFileName(report.siteName, "plac");
 
   // 1. Podpisy i zdjęcia do prywatnego bucketu (przychodzą jako base64)
   const optimized = await optimizeReportForStorage({ ...report, pdfDataUrl: undefined });

@@ -765,31 +765,20 @@ export function AdminSettings({
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-              <div>
-                <label className="block text-sm font-extrabold text-slate-800 dark:text-slate-200 mb-1.5">
-                  Adres e-mail Nadawcy:
-                </label>
-                <input
-                  type="email"
-                  value={resendFromEmail}
-                  onChange={(e) => setResendFromEmail(e.target.value)}
-                  placeholder="raporty@shift.rycos.eu"
-                  className="w-full h-12 px-4 bg-slate-50 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 rounded-2xl text-sm font-semibold"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-extrabold text-slate-800 dark:text-slate-200 mb-1.5">
-                  Klucz API Resend:
-                </label>
-                <div className="p-3.5 bg-slate-100 dark:bg-slate-950/60 border-2 border-slate-200 dark:border-slate-800 rounded-2xl text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                  Konfigurowany wyłącznie po stronie serwera, w zmiennej
-                  środowiskowej <code className="font-mono text-slate-800 dark:text-slate-200">RESEND_API_KEY</code>.
-                  Wcześniej klucz leżał w pamięci przeglądarki każdego brygadzisty i był
-                  wysyłany razem z każdym raportem.
-                </div>
-              </div>
+            {/* Klucz API Resend nie ma tu żadnego pola ani opisu: od Etapu 2
+                żyje wyłącznie w zmiennej środowiskowej po stronie serwera
+                i panel nie ma z nim nic wspólnego. */}
+            <div className="pt-2 sm:max-w-md">
+              <label className="block text-sm font-extrabold text-slate-800 dark:text-slate-200 mb-1.5">
+                Adres e-mail Nadawcy:
+              </label>
+              <input
+                type="email"
+                value={resendFromEmail}
+                onChange={(e) => setResendFromEmail(e.target.value)}
+                placeholder="raporty@shift.rycos.eu"
+                className="w-full h-12 px-4 bg-slate-50 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 rounded-2xl text-sm font-semibold"
+              />
             </div>
 
             <div className="flex justify-end pt-4">

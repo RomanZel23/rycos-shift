@@ -26,6 +26,10 @@ interface GeoLocationBadgeProps {
  * przycisk, oraz odczyt `navigator.permissions` — przy trwałej odmowie żadne
  * klikanie nie wywoła już monitu i trzeba o tym powiedzieć wprost, zamiast
  * kazać ludziom naciskać przycisk, który nic nie zrobi.
+ *
+ * W komunikatach mowa o „ikonie po lewej stronie adresu”, a nie o kłódce:
+ * Chrome pokazuje tam suwaki, Safari literki AA, a kłódka została już tylko
+ * w części przeglądarek. Opis kształtu szybciej się dezaktualizuje niż miejsce.
  */
 
 /** Dłuższy niż `timeout` poniżej — wchodzi do gry, gdy przeglądarka milczy. */
@@ -77,8 +81,8 @@ export function GeoLocationBadge({ onLocationChange, location }: GeoLocationBadg
       // Wywołanie i tak skończyłoby się błędem bez pokazania monitu.
       setLoading(false);
       setErrorMsg(
-        "Dostęp do lokalizacji jest zablokowany w przeglądarce. Kliknij kłódkę przy adresie strony, " +
-          "włącz „Lokalizacja”, a potem naciśnij Odśwież."
+        "Dostęp do lokalizacji jest zablokowany w przeglądarce. Kliknij ikonę po lewej stronie " +
+          "adresu strony, włącz „Lokalizacja”, a potem naciśnij Odśwież."
       );
       return;
     }
@@ -116,8 +120,8 @@ export function GeoLocationBadge({ onLocationChange, location }: GeoLocationBadg
         if (err.code === err.PERMISSION_DENIED) {
           setUprawnienie("odmowa");
           setErrorMsg(
-            "Odmówiono dostępu do lokalizacji. Kliknij kłódkę przy adresie strony, włącz " +
-              "„Lokalizacja”, a potem naciśnij Odśwież."
+            "Odmówiono dostępu do lokalizacji. Kliknij ikonę po lewej stronie adresu strony, " +
+              "włącz „Lokalizacja”, a potem naciśnij Odśwież."
           );
         } else if (err.code === err.POSITION_UNAVAILABLE) {
           setErrorMsg(
