@@ -56,7 +56,7 @@ export default function Home() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isSupabaseConnected, setIsSupabaseConnected] = useState(true);
 
-  // Etap 0: bramka dostępu do API (autoryzacja urządzenia kodem)
+  // Etap 0: bramka dostępu do API (autoryzacja przeglądarki kodem)
   const [isGateChecked, setIsGateChecked] = useState(false);
   const [isGateLocked, setIsGateLocked] = useState(false);
 
@@ -66,7 +66,7 @@ export default function Home() {
       setIsSyncing(true);
       const res = await fetch("/api/db/sync");
 
-      // Bramka urządzenia albo wygasła sesja użytkownika
+      // Bramka przeglądarki albo wygasła sesja użytkownika
       if (res.status === 401 || res.status === 503) {
         const body = await res.json().catch(() => null);
         if (body?.code === "GATE_LOCKED" || body?.code === "GATE_NOT_CONFIGURED") {
@@ -372,7 +372,7 @@ export default function Home() {
     saveStoredReport(report);
   };
 
-  // ETAP 0: URZĄDZENIE BEZ AUTORYZACJI -> EKRAN KODU DOSTĘPU PRZED LOGOWANIEM
+  // ETAP 0: PRZEGLĄDARKA BEZ AUTORYZACJI -> EKRAN KODU DOSTĘPU PRZED LOGOWANIEM
   if (isGateChecked && isGateLocked) {
     return <AccessGate onUnlocked={handleGateUnlocked} />;
   }

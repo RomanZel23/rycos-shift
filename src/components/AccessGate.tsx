@@ -8,10 +8,20 @@ interface AccessGateProps {
 }
 
 /**
- * Etap 0 — jednorazowa autoryzacja urządzenia kodem dostępu.
+ * Etap 0 — autoryzacja przeglądarki kodem dostępu, przed logowaniem pracownika.
  *
- * Ekran pokazuje się raz na urządzenie (ciasteczko httpOnly, 30 dni), przed
- * logowaniem pracownika. Etap 1 zastąpi tę bramkę pełną sesją użytkownika.
+ * O nazewnictwie (uwaga klienta #015): to jest autoryzacja PRZEGLĄDARKI, nie
+ * urządzenia. Dowód nosi ciasteczko httpOnly, a osobne magazyny ciasteczek mają
+ * inny profil, tryb prywatny i aplikacja dodana do ekranu głównego na iOS.
+ * Dawne „wystarczy raz na telefon" rodziło słuszne pretensje, gdy ten sam
+ * telefon pytał o kod drugi raz.
+ *
+ * Ekran NIE wraca po wylogowaniu — /api/auth/logout kasuje wyłącznie ciasteczko
+ * sesji. Wraca po 30 dniach bez korzystania (okno jest przesuwane przy każdym
+ * żądaniu, patrz proxy.ts), po wyczyszczeniu danych przeglądarki oraz po
+ * zmianie APP_ACCESS_CODE lub GATE_SECRET — token to HMAC z kodu dostępu, więc
+ * zmiana kodu unieważnia wszystkie przeglądarki naraz. Tak ma być: to jedyna
+ * droga odcięcia zgubionego telefonu.
  */
 export function AccessGate({ onUnlocked }: AccessGateProps) {
   const [code, setCode] = useState("");
@@ -39,7 +49,7 @@ export function AccessGate({ onUnlocked }: AccessGateProps) {
         return;
       }
 
-      setErrorMessage(data.message || "Nie udało się autoryzować urządzenia.");
+      setErrorMessage(data.message || "Nie udało się autoryzować przeglądarki.");
     } catch {
       setErrorMessage("Brak połączenia z serwerem. Sprawdź zasięg i spróbuj ponownie.");
     } finally {
@@ -59,7 +69,7 @@ export function AccessGate({ onUnlocked }: AccessGateProps) {
               RYCOS Shift
             </h1>
             <p className="text-xs sm:text-sm text-slate-400 font-medium mt-1">
-              Autoryzacja urządzenia
+              Autoryzacja przeglądarki
             </p>
           </div>
         </div>
@@ -76,8 +86,9 @@ export function AccessGate({ onUnlocked }: AccessGateProps) {
           className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 space-y-5 shadow-xl"
         >
           <p className="text-sm text-slate-300 leading-relaxed">
-            To urządzenie nie ma jeszcze dostępu do systemu. Wpisz kod dostępu otrzymany
-            od administratora — wystarczy raz na telefon.
+            Ta przeglądarka nie ma jeszcze dostępu do systemu. Wpisz kod dostępu
+            otrzymany od administratora — kod podajesz raz w tej przeglądarce.
+            Aplikacja dodana do ekranu głównego liczy się osobno.
           </p>
 
           <div className="space-y-2">
@@ -108,7 +119,7 @@ export function AccessGate({ onUnlocked }: AccessGateProps) {
             disabled={!code.trim() || isLoading}
             className="w-full py-3.5 rounded-2xl bg-sky-600 hover:bg-sky-500 disabled:bg-slate-800 disabled:text-slate-500 text-white font-black text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:cursor-not-allowed"
           >
-            {isLoading ? "Sprawdzanie..." : "Autoryzuj urządzenie"}
+            {isLoading ? "Sprawdzanie..." : "Autoryzuj przeglądarkę"}
             {!isLoading && <ArrowRight className="w-4 h-4" />}
           </button>
         </form>

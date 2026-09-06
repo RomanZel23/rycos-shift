@@ -7,13 +7,24 @@ import { createHmac, timingSafeEqual } from "crypto";
  * odcięcie anonimowego ruchu z internetu od API, które dziś oddaje wszystkie
  * dane osobowe i pozwala kasować rekordy.
  *
- * Zasada działania: urządzenie raz podaje kod dostępu, dostaje ciasteczko
+ * Zasada działania: przeglądarka raz podaje kod dostępu, dostaje ciasteczko
  * httpOnly z deterministycznym tokenem HMAC. Token da się zweryfikować
  * bezstanowo, więc nie potrzeba store'u sesji.
+ *
+ * Zakres ciasteczka to PRZEGLĄDARKA, nie urządzenie. Inny profil, tryb
+ * prywatny i aplikacja dodana do ekranu głównego na iOS mają osobne magazyny
+ * ciasteczek, więc każde z nich poprosi o kod osobno. Ekran bramki mówi o tym
+ * wprost — wcześniejsze „wystarczy raz na telefon" było obietnicą nie do
+ * dotrzymania.
+ *
+ * Ważność jest przedłużana przy każdym żądaniu z poprawnym tokenem (proxy.ts
+ * oraz GET /api/gate), więc 30 dni liczy się od OSTATNIEGO użycia aplikacji,
+ * a nie od pierwszego wpisania kodu. Bez tego ekran kodu wracał co miesiąc
+ * nawet osobom pracującym w aplikacji codziennie.
  */
 
 export const GATE_COOKIE = "rycos_gate";
-export const GATE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30; // 30 dni
+export const GATE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30; // 30 dni od ostatniego użycia
 
 const TOKEN_PAYLOAD = "rycos-gate-v1";
 
@@ -65,6 +76,21 @@ export function verifyGateToken(token?: string | null): boolean {
   return safeEquals(token, expectedGateToken());
 }
 
+/**
+ * Opcje ciasteczka bramki — jedno miejsce dla /api/gate i dla przedłużania
+ * ważności w proxy.ts. Rozjazd między tymi dwoma zestawami atrybutów kasowałby
+ * i zakładał ciasteczko na przemian zamiast je przedłużać.
+ */
+export function gateCookieOptions(maxAgeSeconds: number = GATE_MAX_AGE_SECONDS) {
+  return {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: maxAgeSeconds,
+  };
+}
+
 /** Weryfikacja kodu wpisanego przez użytkownika. */
 export function verifyAccessCode(code?: string | null): boolean {
   if (!isGateConfigured()) return false;
@@ -95,7 +121,7 @@ export function gateFailure(token?: string | null):
     return {
       status: 401,
       code: "GATE_LOCKED",
-      message: "Urządzenie nie ma autoryzacji. Podaj kod dostępu do aplikacji.",
+      message: "Ta przeglądarka nie ma autoryzacji. Podaj kod dostępu do aplikacji.",
     };
   }
 

@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { GATE_COOKIE, gateFailure } from "@/lib/gate";
+import { GATE_COOKIE, gateCookieOptions, gateFailure, verifyGateToken } from "@/lib/gate";
 import { SESSION_COOKIE, readSessionToken } from "@/lib/session";
 
 /**
  * Dwie warstwy przed każdym /api/*:
  *
- *   1. Bramka urządzenia (Etap 0) — odcina anonimowy ruch z internetu.
+ *   1. Bramka przeglądarki (Etap 0) — odcina anonimowy ruch z internetu.
  *   2. Sesja użytkownika (Etap 1) — tani sprawdzian podpisu ciasteczka.
  *
  * Warstwa druga celowo NIE dotyka bazy. Autorytatywna weryfikacja — czy konto
@@ -40,7 +40,8 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const failure = gateFailure(request.cookies.get(GATE_COOKIE)?.value);
+  const gateToken = request.cookies.get(GATE_COOKIE)?.value;
+  const failure = gateFailure(gateToken);
   if (failure) {
     return NextResponse.json(
       {
@@ -53,8 +54,24 @@ export function proxy(request: NextRequest) {
     );
   }
 
+  /**
+   * Każde przepuszczone żądanie przedłuża ważność bramki. Token jest
+   * deterministyczny — nie niesie daty wystawienia — więc jedyne, co da się
+   * przesunąć, to Max-Age ciasteczka. I to wystarcza: 30 dni liczy się od
+   * ostatniego użycia aplikacji, a nie od pierwszego wpisania kodu.
+   * Wartość zostaje ta sama, więc odświeżenie w jednej karcie nie wywala
+   * pozostałych.
+   */
+  const przepusc = () => {
+    const res = NextResponse.next();
+    if (gateToken && verifyGateToken(gateToken)) {
+      res.cookies.set({ name: GATE_COOKIE, value: gateToken, ...gateCookieOptions() });
+    }
+    return res;
+  };
+
   if (matches(pathname, GATE_ONLY_API_PATHS)) {
-    return NextResponse.next();
+    return przepusc();
   }
 
   const session = readSessionToken(request.cookies.get(SESSION_COOKIE)?.value);
@@ -70,7 +87,7 @@ export function proxy(request: NextRequest) {
     );
   }
 
-  return NextResponse.next();
+  return przepusc();
 }
 
 export const config = {

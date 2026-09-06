@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   GATE_COOKIE,
-  GATE_MAX_AGE_SECONDS,
   expectedGateToken,
+  gateCookieOptions,
   isGateConfigured,
   isGateEnforced,
   verifyAccessCode,
@@ -48,17 +48,26 @@ function clearAttempts(key: string): void {
   attempts.delete(key);
 }
 
-/** Stan bramki dla klienta: czy trzeba pytać o kod i czy to urządzenie już przeszło. */
+/** Stan bramki dla klienta: czy trzeba pytać o kod i czy ta przeglądarka już przeszła. */
 export async function GET(req: NextRequest) {
   const token = req.cookies.get(GATE_COOKIE)?.value;
-  return NextResponse.json({
+  const unlocked = verifyGateToken(token);
+
+  const res = NextResponse.json({
     required: isGateEnforced(),
     configured: isGateConfigured(),
-    unlocked: verifyGateToken(token),
+    unlocked,
   });
+
+  // Samo wejście na stronę też przedłuża autoryzację. Ten endpoint jest przed
+  // bramką (PUBLIC_API_PATHS), więc proxy.ts go nie odświeża.
+  if (unlocked && token) {
+    res.cookies.set({ name: GATE_COOKIE, value: token, ...gateCookieOptions() });
+  }
+  return res;
 }
 
-/** Odblokowanie urządzenia kodem dostępu. */
+/** Odblokowanie przeglądarki kodem dostępu. */
 export async function POST(req: NextRequest) {
   if (!isGateConfigured()) {
     return NextResponse.json(
@@ -103,29 +112,13 @@ export async function POST(req: NextRequest) {
   clearAttempts(key);
 
   const res = NextResponse.json({ success: true });
-  res.cookies.set({
-    name: GATE_COOKIE,
-    value: expectedGateToken(),
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: GATE_MAX_AGE_SECONDS,
-  });
+  res.cookies.set({ name: GATE_COOKIE, value: expectedGateToken(), ...gateCookieOptions() });
   return res;
 }
 
-/** Odpięcie urządzenia (np. zgubiony telefon — po zmianie APP_ACCESS_CODE). */
+/** Odpięcie przeglądarki (np. zgubiony telefon — po zmianie APP_ACCESS_CODE). */
 export async function DELETE() {
   const res = NextResponse.json({ success: true });
-  res.cookies.set({
-    name: GATE_COOKIE,
-    value: "",
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 0,
-  });
+  res.cookies.set({ name: GATE_COOKIE, value: "", ...gateCookieOptions(0) });
   return res;
 }
