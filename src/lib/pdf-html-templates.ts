@@ -40,7 +40,16 @@ export const PAGE_MARGIN_MM = {
   left: LETTERHEAD.contentLeftMm,
 } as const;
 
-const FONT_STACK = "'Liberation Sans', 'DejaVu Sans', Arial, Helvetica, sans-serif";
+/*
+ * Exo 2 — krój z księgi znaku SolutionsBay. W obrazie Dockera jest wgrany
+ * do systemowego katalogu czcionek, więc Chromium bierze go po nazwie rodziny;
+ * renderer ma odciętą sieć i nie pobierze niczego z zewnątrz.
+ *
+ * Dalsze pozycje to zabezpieczenie: gdyby kroju zabrakło, dokument wyjdzie
+ * w Liberation Sans zamiast w czymś przypadkowym. Sprawdzenie obecności Exo 2
+ * jest w Dockerfile, przy budowaniu obrazu.
+ */
+const FONT_STACK = "'Exo 2', 'Liberation Sans', 'DejaVu Sans', Arial, Helvetica, sans-serif";
 const FONT_MONO = "'DejaVu Sans Mono', 'Liberation Mono', monospace";
 
 
@@ -324,12 +333,13 @@ function renderClosing(): string {
   `;
 }
 
-function documentShell(bodyHtml: string): string {
+function documentShell(bodyHtml: string, fontCss = ""): string {
   return `<!DOCTYPE html>
 <html lang="pl">
 <head>
   <meta charset="utf-8" />
-  <style>${baseStyles()}</style>
+  <style>
+    ${fontCss}${baseStyles()}</style>
 </head>
 <body>
 ${bodyHtml}
@@ -343,7 +353,9 @@ ${bodyHtml}
 
 /** Raport rozpoczęcia prac — odprawa BHP i lista obecności z podpisami. */
 export function generateStartShiftHtml(
-  report: DailyReport
+  report: DailyReport,
+  /** Deklaracje @font-face z krojami wstawionymi jako data URL. */
+  fontCss = ""
 ): string {
   const topics = report.discussedTopics || [];
   const attendance = report.attendanceList || [];
@@ -402,12 +414,14 @@ export function generateStartShiftHtml(
     </table>
 
     ${renderClosing()}
-  `);
+  `, fontCss);
 }
 
 /** Raport zakończenia prac — dokumentacja fotograficzna. */
 export function generateEndShiftHtml(
-  report: DailyReport
+  report: DailyReport,
+  /** Deklaracje @font-face z krojami wstawionymi jako data URL. */
+  fontCss = ""
 ): string {
   const photos = report.photoDocumentation || [];
 
@@ -440,5 +454,5 @@ export function generateEndShiftHtml(
     ${cardsHtml}
 
     ${renderClosing()}
-  `);
+  `, fontCss);
 }

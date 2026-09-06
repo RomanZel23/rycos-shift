@@ -54,18 +54,25 @@ ENV HOSTNAME="0.0.0.0"
 
 # Chromium do generowania PDF + kroje pisma z polskimi znakami.
 # puppeteer-core NIE pobiera własnej przeglądarki — używa tej systemowej.
-# fonts-liberation-sans-narrow jest osobnym pakietem i jest OBOWIĄZKOWY:
-# stopka papieru firmowego jest złożona krojem Arial Narrow, a Liberation Sans
-# Narrow jest jego metrycznie zgodnym zamiennikiem — bez niego Chromium
-# podstawia zwykły Liberation Sans, linie stopki robią się o kilkadziesiąt
-# milimetrów szersze i dokument przestaje odpowiadać wzorcowi.
+# Stopka papieru firmowego jest złożona krojem Arial Narrow, a Liberation Sans
+# Narrow to jego metrycznie zgodny zamiennik. Bez niego Chromium podstawia
+# zwykły Liberation Sans, linie stopki robią się o kilkadziesiąt milimetrów
+# szersze i dokument przestaje odpowiadać wzorcowi.
+#
+# Ten krój bywa w różnych pakietach: Debian trzyma go w fonts-liberation
+# (Liberation 1.x, która ma odmiany Narrow), Ubuntu przeniosło fonts-liberation
+# na Liberation 2.x — gdzie odmian Narrow już nie ma — i wydzieliło je do
+# osobnego fonts-liberation-sans-narrow. Próbujemy więc obu dróg i nie
+# wywracamy builda na nazwie pakietu; o to, czy plik faktycznie jest,
+# pyta sprawdzenie niżej.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       chromium \
       fonts-liberation \
-      fonts-liberation-sans-narrow \
       fonts-dejavu-core \
+      fontconfig \
       ca-certificates \
+ && (apt-get install -y --no-install-recommends fonts-liberation-sans-narrow || true) \
  && rm -rf /var/lib/apt/lists/*
 
 ENV CHROMIUM_PATH=/usr/bin/chromium
@@ -87,6 +94,23 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
+# Kroje pisma z repozytorium do systemu.
+#
+# Exo 2 to krój z księgi znaku SolutionsBay (docs/CI_SolutionsBay_2020.pdf) —
+# używa go i portal, i treść raportów. Liberation Sans Narrow zastępuje Arial
+# Narrow w stopce papieru firmowego; bez niego linie stopki robią się o ok.
+# 20 mm szersze niż na wzorcu.
+#
+# Trzymamy je w repozytorium zamiast polegać na pakietach dystrybucji: nazwy
+# pakietów różnią się między Debianem a Ubuntu (na tym wyłożył się build
+# 2026-09-06), a Exo 2 nie ma w repozytoriach Debiana w ogóle. Przeglądarka
+# renderująca PDF ma odciętą sieć, więc krój musi być w obrazie.
+# Licencje leżą obok plików: OFL dla Exo 2, GPL+FE dla Liberation.
+RUN mkdir -p /usr/share/fonts/truetype/rycos \
+ && cp ./public/fonts/*.ttf /usr/share/fonts/truetype/rycos/ \
+ && fc-cache -f > /dev/null \
+ && echo "Kroje wgrane: $(ls /usr/share/fonts/truetype/rycos | wc -l)"
+
 USER nextjs
 
 # Sprawdzenie przy budowaniu obrazu, że Chromium W OGÓLE WSTAJE na tym
@@ -101,12 +125,19 @@ RUN chromium --headless --no-sandbox --disable-gpu \
       --dump-dom about:blank > /dev/null \
  && echo "Chromium OK"
 
-# Krój stopki. Sprawdzamy przy budowaniu, bo brak tego pliku nie wywala
-# renderowania — po cichu psuje układ dokumentu, a to widać dopiero na wydruku.
-# Szukamy po nazwie pliku, a nie po sztywnej ścieżce — katalog bywa różny
-# między wydaniami Debiana, a fałszywy alarm zablokowałby wdrożenie.
-RUN find /usr/share/fonts -name 'LiberationSansNarrow-Regular.ttf' | grep -q . \
- && echo "Liberation Sans Narrow OK"
+# Kroje pisma. Sprawdzamy przy budowaniu, bo ich brak nie wywala renderowania
+# — po cichu psuje układ dokumentu, a widać to dopiero na wydruku u klienta.
+# Pytamy fontconfig o rodzinę, a nie o ścieżkę pliku: liczy się to, co naprawdę
+# zobaczy Chromium.
+RUN for rodzina in "Exo 2" "Liberation Sans Narrow"; do \
+      znaleziona=$(fc-match "$rodzina" family); \
+      case "$znaleziona" in \
+        *"$rodzina"*) echo "Krój OK: $rodzina" ;; \
+        *) echo "BLAD: brak kroju '$rodzina' — fontconfig podstawia '$znaleziona'."; \
+           echo "      Sprawdz public/fonts/ w repozytorium i krok kopiujacy kroje wyzej."; \
+           exit 1 ;; \
+      esac; \
+    done
 
 EXPOSE 3000
 

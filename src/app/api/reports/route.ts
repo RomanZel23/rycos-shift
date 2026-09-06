@@ -5,7 +5,7 @@ import { optimizeReportForStorage } from "@/lib/supabase-storage";
 import { BUCKET_NAME, storagePathFromRef, toAppFileUrl } from "@/lib/storage-paths";
 import { generateEndShiftHtml, generateStartShiftHtml } from "@/lib/pdf-html-templates";
 import { renderHtmlToPdf, BrowserLaunchError } from "@/lib/pdf-renderer";
-import { loadLogoDataUrl, mediaAsDataUrls } from "@/lib/pdf-assets";
+import { loadExoFontFaceCss, loadLogoDataUrl, mediaAsDataUrls } from "@/lib/pdf-assets";
 import { resolveEmailConfig, sendReportEmail } from "@/lib/email";
 import { sanitizePdfFileName } from "@/lib/pdf-generator";
 import { DailyReport } from "@/types";
@@ -90,14 +90,15 @@ export async function POST(req: NextRequest) {
   // Obrazy muszą być wstawione jako data URL — renderer nie ma dostępu do sieci.
   let pdfBuffer: Buffer;
   try {
-    const [forRender, logoDataUrl] = await Promise.all([
+    const [forRender, logoDataUrl, fontCss] = await Promise.all([
       mediaAsDataUrls(optimized),
       loadLogoDataUrl(),
+      loadExoFontFaceCss(),
     ]);
     const html =
       report.reportType === "START_SHIFT"
-        ? generateStartShiftHtml(forRender)
-        : generateEndShiftHtml(forRender);
+        ? generateStartShiftHtml(forRender, fontCss)
+        : generateEndShiftHtml(forRender, fontCss);
 
     pdfBuffer = await renderHtmlToPdf(html, {
       documentName: `${
