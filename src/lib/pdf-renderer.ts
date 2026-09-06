@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Browser } from "puppeteer-core";
 import puppeteer from "puppeteer-core";
-import { COMPANY, companyContactLine, companyRegistryLine } from "./brand";
+import { COMPANY, LETTERHEAD, companyRegistryLine, fullLogoSvg } from "./brand";
 
 /**
  * Etap 3 — renderowanie PDF po stronie serwera przez Chromium.
@@ -141,39 +141,123 @@ export class BrowserLaunchError extends Error {
 }
 
 /**
- * Stopka odwzorowuje papier firmowy (docs/logo/company_layout.pdf): trzy linie
- * danych rejestrowych drobnym szarym drukiem, wyrównane do lewej. Numeracja
- * stron idzie po prawej, w tej samej linii co nazwa dokumentu.
+ * Nagłówek i stopka odwzorowują papier firmowy (docs/logo/company_layout.pdf).
  *
- * Stopka jest osobnym dokumentem renderowanym przez Chromium — nie widzi CSS
- * strony i nie pobierze żadnego pliku, więc style są wpisane wprost, a kroje
- * ograniczone do tych, które są w obrazie Dockera.
+ * Rysuje je Chromium w marginesach strony, więc powtarzają się na KAŻDEJ
+ * stronie — tak jak na papierze. Ten dokument nie widzi CSS strony i nie
+ * pobierze żadnego pliku, dlatego style są wpisane wprost, a obrazy muszą
+ * przyjść jako data URL.
+ *
+ * Pozycje są liczone od lewej górnej krawędzi arkusza, bo pudełko nagłówka
+ * i stopki obejmuje całą szerokość papieru razem z marginesami. Współrzędne
+ * pochodzą z pomiaru wzorca — patrz LETTERHEAD w src/lib/brand.ts.
  */
-function footerTemplate(reportName: string): string {
-  const esc = (s: string) =>
-    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/**
+ * Chromium NIE umieszcza pudełka nagłówka i stopki przy samej krawędzi arkusza
+ * — wsuwa je o stały dystans (ok. 5,2 mm). Bez tej poprawki loga wychodziły
+ * o te 5 mm za nisko, a stopka o 5 mm za wysoko względem wzorca.
+ *
+ * Wartości zmierzone dla A4 i marginesów z PAGE_MARGIN_MM przez wstawienie
+ * pasków kontrolnych na krawędziach obu pudełek i odczytanie ich pozycji
+ * z gotowego PDF-a (scripts/zmierz-uklad.mjs). Zmiana marginesów strony albo
+ * większa aktualizacja Chromium może je przesunąć — wtedy trzeba przemierzyć.
+ */
+const HEADER_BOX_TOP_MM = 5.29;
+const FOOTER_BOX_TOP_MM = 265.64;
+
+/**
+ * Odległość od górnej krawędzi wiersza tekstu do dolnej krawędzi liter,
+ * dla kroju stopki przy line-height ustawionym na skok wierszy ze wzorca.
+ * Też zmierzona, nie wyliczona z metryk — te różnią się między wersjami kroju.
+ */
+const FOOTER_TEXT_DROP_MM = 3.2;
+
+function esc(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function headerTemplate(logoDataUrl?: string): string {
+  const { idream, solutionsBay } = LETTERHEAD;
+  const gora = (yMm: number) => (yMm - HEADER_BOX_TOP_MM).toFixed(3);
+  return `
+    <div style="position:relative; width:100%; height:100%; margin:0; padding:0;
+                -webkit-print-color-adjust:exact; print-color-adjust:exact;">
+      ${
+        logoDataUrl
+          ? `<img src="${logoDataUrl}" alt="" style="position:absolute;
+               left:${idream.xMm}mm; top:${gora(idream.yMm)}mm;
+               width:${idream.widthMm}mm; height:${idream.heightMm}mm;">`
+          : ""
+      }
+      <div style="position:absolute; left:${solutionsBay.xMm}mm; top:${gora(solutionsBay.yMm)}mm;
+                  width:${solutionsBay.widthMm}mm; line-height:0;">
+        ${fullLogoSvg("light", 'style="width:100%;height:auto;display:block;"')}
+      </div>
+    </div>
+  `;
+}
+
+function footerTemplate(): string {
+  const { footerLeftMm, footerBaselinesMm, footerFontPt, footerAccentFontPt } = LETTERHEAD;
+  const [l1, l2, l3] = footerBaselinesMm;
+  const skok = (footerBaselinesMm[2] - footerBaselinesMm[0]) / 2; // 3,645 mm ze wzorca
+
+  /**
+   * Wiersz stopki ustawiany przez DOLNĄ krawędź liter. Sztywny line-height jest
+   * tu istotny: bez niego większa czerwona litera „B" w pierwszym wierszu
+   * rozpychałaby jego pudełko i psuła odstęp względem wzorca.
+   */
+  const linia = (dolMm: number, tresc: string) => `
+    <div style="position:absolute; left:${footerLeftMm}mm;
+                top:${(dolMm - FOOTER_BOX_TOP_MM - FOOTER_TEXT_DROP_MM).toFixed(3)}mm;
+                font-size:${footerFontPt}pt; line-height:${skok.toFixed(3)}mm;
+                white-space:nowrap; color:${LETTERHEAD.footerColor};">${tresc}</div>`;
+
+  const link = (tekst: string) =>
+    `<span style="color:${LETTERHEAD.footerLinkColor}; text-decoration:underline;">${esc(tekst)}</span>`;
+
+  // Numeracja stron — jedyny element, którego wzorzec nie ma. Trzymamy ją
+  // po prawej, w linii ostatniego wiersza stopki, wyrównaną do prawej
+  // krawędzi logo SolutionsBay, żeby nie rozbijała układu papieru.
+  //
+  // Nazwy dokumentu tu NIE ma celowo: przy dłuższej nazwie placu budowy
+  // nachodziła na trzecią linię stopki, a wzorzec i tak jej nie przewiduje.
+  const prawyMarginesMm =
+    LETTERHEAD.pageWidthMm - (LETTERHEAD.solutionsBay.xMm + LETTERHEAD.solutionsBay.widthMm);
 
   return `
-    <div style="width:100%; padding:0 11mm; box-sizing:border-box;
-                font-family:'Liberation Sans', Arial, sans-serif; color:#64748b;">
-      <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:8mm;">
-        <div style="font-size:5.5pt; line-height:1.45; text-align:left;">
-          <div>${esc(COMPANY.legalName)}</div>
-          <div>${esc(companyRegistryLine())}</div>
-          <div>${esc(companyContactLine())}</div>
-        </div>
-        <div style="font-size:6pt; white-space:nowrap; text-align:right; line-height:1.45;">
-          <div>${esc(reportName)}</div>
-          <div>Strona <span class="pageNumber"></span> z <span class="totalPages"></span></div>
-        </div>
+    <div style="position:relative; width:100%; height:100%; margin:0; padding:0;
+                font-family:'Liberation Sans Narrow','Arial Narrow',Arial,sans-serif;
+                -webkit-print-color-adjust:exact; print-color-adjust:exact;">
+      ${linia(
+        l1,
+        `iDream <span style="font-size:${footerAccentFontPt}pt; line-height:0; color:${LETTERHEAD.footerAccentColor};">B</span>usiness Center spółka z ograniczoną odpowiedzialnością`
+      )}
+      ${linia(l2, esc(companyRegistryLine()))}
+      ${linia(
+        l3,
+        `tel. ${esc(COMPANY.phone)}, e-mail: ${link(COMPANY.email)}, ${link(COMPANY.www)}`
+      )}
+      <div style="position:absolute; right:${prawyMarginesMm.toFixed(2)}mm;
+                  top:${(l3 - FOOTER_BOX_TOP_MM - FOOTER_TEXT_DROP_MM).toFixed(3)}mm;
+                  font-size:${footerFontPt}pt; line-height:${skok.toFixed(3)}mm;
+                  white-space:nowrap; color:${LETTERHEAD.footerColor};">
+        Strona <span class="pageNumber"></span> z <span class="totalPages"></span>
       </div>
     </div>
   `;
 }
 
 export interface RenderOptions {
-  /** Trafia do stopki na każdej stronie — ułatwia identyfikację wydruku. */
+  /**
+   * Nazwa dokumentu w metadanych PDF-a. Do stopki nie trafia — wzorzec papieru
+   * firmowego jej nie przewiduje, a przy dłuższej nazwie placu nachodziła na
+   * dane rejestrowe.
+   */
   documentName: string;
+  /** Logo iDream jako data URL — nagłówek nie ma dostępu do sieci ani plików. */
+  logoDataUrl?: string;
 }
 
 /**
@@ -218,8 +302,8 @@ export async function renderHtmlToPdf(
       printBackground: true,
       preferCSSPageSize: true,
       displayHeaderFooter: true,
-      headerTemplate: "<div></div>",
-      footerTemplate: footerTemplate(options.documentName),
+      headerTemplate: headerTemplate(options.logoDataUrl),
+      footerTemplate: footerTemplate(),
       timeout: RENDER_TIMEOUT_MS,
     });
 

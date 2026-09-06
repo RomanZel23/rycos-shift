@@ -21,6 +21,7 @@ interface RosterEntry {
   lastName: string;
   role: string;
   isForeman: boolean;
+  isAdmin: boolean;
   hasPin: boolean;
 }
 
@@ -245,8 +246,15 @@ export function LoginForm({ settings, onLogin }: LoginFormProps) {
                         >
                           <div
                             className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-xs ${
-                              u.isForeman ? "bg-sky-500 text-white" : "bg-slate-700 text-slate-200"
+                              // Administrator ma własny kolor — pomarańcz, ten sam
+                              // co tarcza „Administrator" w nagłówku po zalogowaniu.
+                              u.isAdmin
+                                ? "bg-amber-500 text-white"
+                                : u.isForeman
+                                ? "bg-sky-500 text-white"
+                                : "bg-slate-700 text-slate-200"
                             }`}
+                            title={u.isAdmin ? "Administrator" : u.isForeman ? "Brygadzista" : undefined}
                           >
                             {u.firstName[0]}
                             {u.lastName[0]}

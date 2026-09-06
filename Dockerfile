@@ -54,10 +54,16 @@ ENV HOSTNAME="0.0.0.0"
 
 # Chromium do generowania PDF + kroje pisma z polskimi znakami.
 # puppeteer-core NIE pobiera własnej przeglądarki — używa tej systemowej.
+# fonts-liberation-sans-narrow jest osobnym pakietem i jest OBOWIĄZKOWY:
+# stopka papieru firmowego jest złożona krojem Arial Narrow, a Liberation Sans
+# Narrow jest jego metrycznie zgodnym zamiennikiem — bez niego Chromium
+# podstawia zwykły Liberation Sans, linie stopki robią się o kilkadziesiąt
+# milimetrów szersze i dokument przestaje odpowiadać wzorcowi.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       chromium \
       fonts-liberation \
+      fonts-liberation-sans-narrow \
       fonts-dejavu-core \
       ca-certificates \
  && rm -rf /var/lib/apt/lists/*
@@ -94,6 +100,13 @@ RUN chromium --headless --no-sandbox --disable-gpu \
       --disable-crash-reporter --disable-breakpad \
       --dump-dom about:blank > /dev/null \
  && echo "Chromium OK"
+
+# Krój stopki. Sprawdzamy przy budowaniu, bo brak tego pliku nie wywala
+# renderowania — po cichu psuje układ dokumentu, a to widać dopiero na wydruku.
+# Szukamy po nazwie pliku, a nie po sztywnej ścieżce — katalog bywa różny
+# między wydaniami Debiana, a fałszywy alarm zablokowałby wdrożenie.
+RUN find /usr/share/fonts -name 'LiberationSansNarrow-Regular.ttf' | grep -q . \
+ && echo "Liberation Sans Narrow OK"
 
 EXPOSE 3000
 

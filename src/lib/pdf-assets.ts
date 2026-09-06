@@ -21,7 +21,7 @@ let logoCache: string | null | undefined;
 export async function loadLogoDataUrl(): Promise<string | undefined> {
   if (logoCache !== undefined) return logoCache ?? undefined;
   try {
-    const file = await fs.readFile(path.join(process.cwd(), "public", "idream.png"));
+    const file = await fs.readFile(path.join(process.cwd(), "public", "idream-logo.png"));
     logoCache = `data:image/png;base64,${file.toString("base64")}`;
   } catch {
     logoCache = null;

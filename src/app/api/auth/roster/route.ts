@@ -8,9 +8,15 @@ export const dynamic = "force-dynamic";
  * Lista kafelków do trybu „Wybór Pracownika" na ekranie logowania.
  *
  * Endpoint wymaga bramki urządzenia (patrz proxy.ts), ale z oczywistych powodów
- * nie może wymagać sesji. Dlatego oddaje absolutne minimum: imię, nazwisko,
- * stanowisko i informację, czy konto ma w ogóle ustawiony PIN. Bez loginów,
- * bez uprawnień administratora, bez dat i bez czegokolwiek z tabeli raportów.
+ * nie może wymagać sesji. Oddaje więc minimum: imię, nazwisko, stanowisko oraz
+ * informację, czy konto ma ustawiony PIN. Bez loginów, bez dat, bez czegokolwiek
+ * z tabeli raportów.
+ *
+ * `isAdmin` jest tu świadomym wyjątkiem, na życzenie klienta: kafelek
+ * administratora ma być wyróżniony kolorem już na ekranie wyboru pracownika.
+ * Oznacza to, że lista serwowana PRZED zalogowaniem wskazuje, które konto jest
+ * administratorem. Ryzyko domykają PIN, blokada po nieudanych próbach
+ * (src/app/api/auth/login) i kod dostępu do urządzenia.
  */
 export async function GET() {
   if (!isSupabaseConfigured()) {
@@ -22,7 +28,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("users")
-    .select("id, first_name, last_name, role, is_foreman, pin_hash")
+    .select("id, first_name, last_name, role, is_foreman, is_admin, pin_hash")
     .order("last_name", { ascending: true });
 
   if (error) {
@@ -35,6 +41,7 @@ export async function GET() {
     lastName: row.last_name,
     role: row.role,
     isForeman: Boolean(row.is_foreman),
+    isAdmin: Boolean(row.is_admin),
     hasPin: Boolean(row.pin_hash),
   }));
 

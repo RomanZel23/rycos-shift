@@ -96,13 +96,14 @@ export async function POST(req: NextRequest) {
     ]);
     const html =
       report.reportType === "START_SHIFT"
-        ? generateStartShiftHtml(forRender, undefined, { logoDataUrl })
-        : generateEndShiftHtml(forRender, undefined, { logoDataUrl });
+        ? generateStartShiftHtml(forRender)
+        : generateEndShiftHtml(forRender);
 
     pdfBuffer = await renderHtmlToPdf(html, {
       documentName: `${
         report.reportType === "START_SHIFT" ? "Rozpoczęcie prac" : "Zakończenie prac"
       } — ${report.siteName} — ${report.date}`,
+      logoDataUrl,
     });
   } catch (err) {
     console.error("PDF render error:", err);

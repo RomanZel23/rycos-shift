@@ -125,3 +125,36 @@ export function companyRegistryLine(): string {
 export function companyContactLine(): string {
   return `tel. ${COMPANY.phone}, e-mail: ${COMPANY.email}, ${COMPANY.www}`;
 }
+
+/**
+ * Geometria papieru firmowego, zmierzona z docs/logo/company_layout.pdf.
+ *
+ * Wszystkie wartości w milimetrach, liczone od LEWEGO GÓRNEGO rogu strony A4
+ * i dotyczą WIDOCZNEGO ZNAKU, nie ramki pliku graficznego. To rozróżnienie jest
+ * istotne: w oryginale oba loga są obrazkami z wtopionymi białymi marginesami,
+ * więc ustawienie ramki pod współrzędne z tabeli dałoby logo mniejsze
+ * i przesunięte. Dlatego idream-logo.png jest przycięty do samego znaku.
+ */
+export const LETTERHEAD = {
+  /** Strona wzorca: 596 x 842 pt. */
+  pageWidthMm: 210.26,
+  pageHeightMm: 297.04,
+
+  idream: { xMm: 22.51, yMm: 13.7, widthMm: 42.85, heightMm: 9.37 },
+  solutionsBay: { xMm: 131.2, yMm: 13.5, widthMm: 54.55, heightMm: 9.3 },
+
+  /** Lewa krawędź tekstu stopki — we wzorcu jest wcięty, lewa strona pusta. */
+  footerLeftMm: 47.5,
+  /** Dolne krawędzie kolejnych linii stopki. */
+  footerBaselinesMm: [277.35, 281.0, 284.64],
+  footerFontPt: 9,
+  /** „B" w słowie „Business" jest większe i czerwone — tak jest we wzorcu. */
+  footerAccentFontPt: 10,
+  footerColor: "#808080",
+  footerAccentColor: "#ff0000",
+  footerLinkColor: "#0000ff",
+
+  /** Marginesy treści raportu wyrównane do logo (lewa 21,5 / prawa 22,4). */
+  contentLeftMm: 21.5,
+  contentRightMm: 22.4,
+} as const;

@@ -1,4 +1,4 @@
-import type { DailyReport, TenantSettings } from "@/types";
+import type { DailyReport } from "@/types";
 import { formatPolishTime } from "./date-utils";
 
 /**
@@ -25,7 +25,20 @@ import { formatPolishTime } from "./date-utils";
  * systemu użytkownika — to ich metryki psuły poprzedni układ.
  */
 
-import { fullLogoSvg } from "./brand";
+import { LETTERHEAD } from "./brand";
+
+/**
+ * Marginesy strony. Lewy i prawy są wyrównane do logo z papieru firmowego,
+ * żeby kolumna tekstu nie była szersza niż nagłówek. Górny i dolny muszą
+ * pomieścić nagłówek (znak kończy się na 23,5 mm) i trzylinijkową stopkę
+ * (ostatnia linia sięga 284,6 mm) — rysuje je Chromium w tych marginesach.
+ */
+export const PAGE_MARGIN_MM = {
+  top: 28,
+  right: LETTERHEAD.contentRightMm,
+  bottom: 26,
+  left: LETTERHEAD.contentLeftMm,
+} as const;
 
 const FONT_STACK = "'Liberation Sans', 'DejaVu Sans', Arial, Helvetica, sans-serif";
 const FONT_MONO = "'DejaVu Sans Mono', 'Liberation Mono', monospace";
@@ -44,9 +57,9 @@ function baseStyles(): string {
   return `
     @page {
       size: A4;
-      /* Dolny margines mieści trzylinijkową stopkę z danymi rejestrowymi
-         (jak na papierze firmowym) plus numerację stron. */
-      margin: 12mm 11mm 22mm 11mm;
+      /* Wartości z PAGE_MARGIN_MM — w tych marginesach Chromium rysuje
+         nagłówek z logo i stopkę z danymi rejestrowymi. */
+      margin: ${PAGE_MARGIN_MM.top}mm ${PAGE_MARGIN_MM.right}mm ${PAGE_MARGIN_MM.bottom}mm ${PAGE_MARGIN_MM.left}mm;
     }
 
     * { box-sizing: border-box; }
@@ -62,18 +75,6 @@ function baseStyles(): string {
       print-color-adjust: exact;
     }
 
-    .letterhead {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 2px solid #0f172a;
-      padding-bottom: 10px;
-      margin-bottom: 14px;
-    }
-    .letterhead img { height: 40px; width: auto; display: block; }
-    /* Proporcja znaku to 648:111, więc 150px szerokości daje ok. 26px wysokości. */
-    .letterhead .sb-logo { width: 150px; }
-    .letterhead .sb-logo svg { width: 100%; height: auto; display: block; }
 
     .title-bar {
       display: flex;
@@ -265,26 +266,6 @@ function baseStyles(): string {
   `;
 }
 
-/**
- * Nagłówek odwzorowuje papier firmowy (docs/logo/company_layout.pdf):
- * iDream Business Center z lewej, SolutionsBay z prawej. Oba znaki są
- * prawdziwe — logo SolutionsBay wstawiamy jako SVG wprost z src/lib/brand.ts,
- * więc jest wektorowe i nie zależy od pobrania pliku (Chromium renderujący
- * dokument ma zablokowaną sieć).
- */
-function renderLetterhead(logoDataUrl?: string): string {
-  return `
-    <div class="letterhead">
-      ${
-        logoDataUrl
-          ? `<img src="${escapeHtml(logoDataUrl)}" alt="iDream Business Center" />`
-          : `<span style="font-size:17px;font-weight:800;color:#002c47;">iDream Business Center</span>`
-      }
-      <div class="sb-logo">${fullLogoSvg("light")}</div>
-    </div>
-  `;
-}
-
 function renderTitleBar(report: DailyReport, typeName: string): string {
   return `
     <div class="title-bar">
@@ -356,16 +337,13 @@ ${bodyHtml}
 </html>`;
 }
 
-export interface TemplateAssets {
-  /** Logo iDream jako data URL — Chromium renderuje bez dostępu do sieci. */
-  logoDataUrl?: string;
-}
+// Logo nie jest już częścią treści dokumentu — nagłówek rysuje Chromium
+// w marginesie strony, żeby powtarzał się na każdej stronie tak jak na
+// papierze firmowym. Patrz headerTemplate w src/lib/pdf-renderer.ts.
 
 /** Raport rozpoczęcia prac — odprawa BHP i lista obecności z podpisami. */
 export function generateStartShiftHtml(
-  report: DailyReport,
-  settings?: TenantSettings,
-  assets?: TemplateAssets
+  report: DailyReport
 ): string {
   const topics = report.discussedTopics || [];
   const attendance = report.attendanceList || [];
@@ -403,7 +381,6 @@ export function generateStartShiftHtml(
     : `<tr><td colspan="5" style="text-align:center;color:#64748b;padding:14px;">Brak wpisów na liście obecności.</td></tr>`;
 
   return documentShell(`
-    ${renderLetterhead(assets?.logoDataUrl)}
     ${renderTitleBar(report, "Rozpoczęcie prac zespołu")}
     ${renderMeta(report)}
 
@@ -430,9 +407,7 @@ export function generateStartShiftHtml(
 
 /** Raport zakończenia prac — dokumentacja fotograficzna. */
 export function generateEndShiftHtml(
-  report: DailyReport,
-  settings?: TenantSettings,
-  assets?: TemplateAssets
+  report: DailyReport
 ): string {
   const photos = report.photoDocumentation || [];
 
@@ -458,7 +433,6 @@ export function generateEndShiftHtml(
     : `<div style="font-size:11px;color:#64748b;">Brak dokumentacji fotograficznej.</div>`;
 
   return documentShell(`
-    ${renderLetterhead(assets?.logoDataUrl)}
     ${renderTitleBar(report, "Zakończenie prac zespołu — fotorelacja")}
     ${renderMeta(report)}
 
