@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { Header, ActiveTab } from "@/components/Header";
 import { StartShiftForm } from "@/components/StartShiftForm";
 import { EndShiftForm } from "@/components/EndShiftForm";
@@ -16,6 +17,7 @@ import {
   TenantSettings,
   DailyReport,
 } from "@/types";
+import { APP_VERSION } from "@/lib/version";
 import {
   INITIAL_SETTINGS,
   getStoredUsers,
@@ -465,14 +467,32 @@ export default function Home() {
       {/* STOPKA INFORMACYJNA */}
       <footer className="hidden sm:block border-t border-slate-200 dark:border-slate-800/80 py-6 text-center text-xs text-slate-500 bg-white/60 dark:bg-slate-900/60 mt-auto">
         <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+          {/*
+            Uwaga klienta #016: nazwa firmy ma być logotypem z odnośnikiem do
+            strony, a człon po kropce bez słowa „workflow". Ten drugi bierze się
+            z Ustawień (logoSubtitle), więc poprawia się go bez wdrożenia.
+          */}
           <div>
-            <strong>{settings?.organizationName || "iDream Business Center"}</strong> • {settings?.logoSubtitle || "SolutionsBay Sp. z o.o."}
+            <a
+              href="https://www.solutionsbay.pl"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-bold text-slate-700 dark:text-slate-300 hover:text-sky-600 dark:hover:text-sky-400 hover:underline transition-colors"
+            >
+              {settings?.organizationName || "SolutionsBay"}
+            </a>{" "}
+            • {settings?.logoSubtitle || "RYCOS Shift"}
           </div>
           <div>
-            System RYCOS Shift — Raportowanie odpraw i fotorelacji z budowy
+            <Link
+              href="/polityka-prywatnosci"
+              className="font-semibold hover:text-sky-600 dark:hover:text-sky-400 hover:underline transition-colors"
+            >
+              Polityka prywatności
+            </Link>
           </div>
           <div className="font-mono text-[11px] text-slate-400">
-            Wersja 1.3 (Supabase Cloud Sync)
+            Wersja {APP_VERSION}
           </div>
         </div>
       </footer>
