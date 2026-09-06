@@ -373,7 +373,7 @@ export function StartShiftForm({
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* NAGŁÓWEK KARTY FORMULARZA */}
           <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-sky-950 text-white rounded-3xl p-6 sm:p-8 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-5 border border-slate-700/50">
-            <div>
+            <div className="min-w-0">
               <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-sky-500/25 text-sky-300 text-xs sm:text-sm font-black uppercase tracking-wider mb-2.5 border border-sky-500/40">
                 <FileText className="w-4 h-4" />
                 <span>Formularz Dzienny</span>
@@ -387,7 +387,7 @@ export function StartShiftForm({
             </div>
 
             {/* AUTOMATYCZNA DATA I CZAS */}
-            <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md px-4 py-3 rounded-2xl border border-white/15 text-sm sm:text-base font-extrabold self-start sm:self-auto">
+            <div className="flex shrink-0 whitespace-nowrap items-center gap-3 bg-white/10 backdrop-blur-md px-4 py-3 rounded-2xl border border-white/15 text-sm sm:text-base font-extrabold self-start sm:self-auto">
               <div className="flex items-center gap-2 text-slate-100">
                 <Calendar className="w-5 h-5 text-sky-400" />
                 <span>{date || "YYYY-MM-DD"}</span>
