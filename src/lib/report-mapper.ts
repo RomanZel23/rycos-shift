@@ -44,6 +44,9 @@ interface PhotoRow {
   inline?: string;
   description?: string;
   takenAt?: string;
+  /** Data wykonania z metadanych pliku — tylko zdjęcia wybrane z galerii. */
+  capturedAt?: string;
+  source?: "aparat" | "galeria";
 }
 
 export interface ReportRow {
@@ -102,6 +105,10 @@ export function rowToDailyReport(row: ReportRow): DailyReport {
     photoDataUrl: refFromStorage(p.path, p.inline),
     description: p.description || "",
     takenAt: p.takenAt || "",
+    // Pola opcjonalne — w raportach sprzed wprowadzenia galerii ich nie ma
+    // i mają wtedy pozostać puste, a nie dostać wartości domyślnej.
+    ...(p.capturedAt ? { capturedAt: p.capturedAt } : {}),
+    ...(p.source ? { source: p.source } : {}),
   }));
 
   return {
@@ -182,6 +189,8 @@ export function dailyReportToRow(report: DailyReport, extras: RowBuildExtras) {
       ...(path ? { path } : p.photoDataUrl ? { inline: p.photoDataUrl } : {}),
       description: p.description,
       takenAt: p.takenAt,
+      ...(p.capturedAt ? { capturedAt: p.capturedAt } : {}),
+      ...(p.source ? { source: p.source } : {}),
     };
   });
 

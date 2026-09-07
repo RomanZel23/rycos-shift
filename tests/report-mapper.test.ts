@@ -110,3 +110,48 @@ test("raport bez daty wysyłki nadal jest poprawnym DailyReport", () => {
   assert.equal(report.id, "rep-end-1");
   assert.equal(formatPolishDateTimeShort(report.emailSentAt), "");
 });
+
+/**
+ * Regresja: mapper przepisuje pozycje zdjęć pole po polu, więc każde nowe pole
+ * trzeba dodać w DWÓCH miejscach — przy zapisie i przy odczycie. Data wykonania
+ * z metadanych przeżyła pierwszą wersję tej zmiany tylko w interfejsie:
+ * do bazy szła, ale wracała pusta.
+ */
+test("data wykonania i pochodzenie zdjęcia przeżywają obieg przez bazę", () => {
+  const raport = rowToDailyReport(
+    row({
+      photos: [
+        {
+          id: "p1",
+          path: "photos/p1.jpg",
+          description: "wykop",
+          takenAt: "2026-09-06T10:00:00.000Z",
+          capturedAt: "2026-09-01T07:15:00",
+          source: "galeria",
+        },
+        { id: "p2", path: "photos/p2.jpg", description: "zbrojenie", takenAt: "" },
+      ],
+    })
+  );
+
+  assert.equal(raport.photoDocumentation?.[0].capturedAt, "2026-09-01T07:15:00");
+  assert.equal(raport.photoDocumentation?.[0].source, "galeria");
+  // Zdjęcie prosto z aparatu (albo raport sprzed tej zmiany) nie dostaje
+  // wartości domyślnych — brak danych ma zostać brakiem danych.
+  assert.equal(raport.photoDocumentation?.[1].capturedAt, undefined);
+  assert.equal(raport.photoDocumentation?.[1].source, undefined);
+
+  const zPowrotem = dailyReportToRow(raport, {
+    pdfPath: "pdf/x.pdf",
+    status: "SENT",
+    sentToEmails: [],
+    emailSentAt: null,
+    errorMessage: null,
+    createdBy: "u1",
+    createdByName: "Jan Kowalski",
+  });
+
+  assert.equal(zPowrotem.photos?.[0].capturedAt, "2026-09-01T07:15:00");
+  assert.equal(zPowrotem.photos?.[0].source, "galeria");
+  assert.ok(!("capturedAt" in (zPowrotem.photos?.[1] ?? {})), "puste pole nie ma trafiać do bazy");
+});

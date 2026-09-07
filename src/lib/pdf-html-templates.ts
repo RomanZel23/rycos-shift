@@ -1,5 +1,6 @@
-import type { DailyReport } from "@/types";
+import type { DailyReport, PhotoDocumentationItem } from "@/types";
 import { formatPolishTime } from "./date-utils";
+import { formatDateTaken } from "./exif";
 
 /**
  * Etap 3 — szablony dokumentu dla renderowania po stronie serwera.
@@ -261,6 +262,12 @@ function baseStyles(): string {
       color: #64748b;
       margin-top: 5px;
     }
+    /* Pochodzenie zdjęcia z galerii — drobnym drukiem pod godziną. */
+    .photo-card .origin {
+      font-size: 8px;
+      color: #94a3b8;
+      margin-top: 2px;
+    }
 
     .closing {
       margin-top: 18px;
@@ -417,6 +424,21 @@ export function generateStartShiftHtml(
   `, fontCss);
 }
 
+/**
+ * Zdjęcie wybrane z galerii mogło powstać kiedy indziej i gdzie indziej, więc
+ * dokument musi to powiedzieć wprost — inaczej godzina przy fotografii sugeruje
+ * moment wykonania, którym nie jest. Zdjęcia prosto z aparatu nie dostają tej
+ * linii, dokumenty sprzed tej zmiany wyglądają więc dokładnie jak wcześniej.
+ */
+function photoOriginHtml(p: PhotoDocumentationItem): string {
+  if (p.source !== "galeria") return "";
+  const kiedy = formatDateTaken(p.capturedAt);
+  const tresc = kiedy
+    ? `z galerii &bull; wykonano ${escapeHtml(kiedy)} wg metadanych pliku`
+    : "z galerii &bull; brak daty wykonania w metadanych pliku";
+  return `<div class="origin">${tresc}</div>`;
+}
+
 /** Raport zakończenia prac — dokumentacja fotograficzna. */
 export function generateEndShiftHtml(
   report: DailyReport,
@@ -437,9 +459,10 @@ export function generateEndShiftHtml(
             <div class="desc">${escapeHtml(
               p.description || "Dokumentacja stanu robót na placu budowy."
             )}</div>
-            <div class="when">Zdjęcie ${i + 1} &bull; wykonano ${escapeHtml(
-              formatPolishTime(p.takenAt || report.time)
-            )}</div>
+            <div class="when">Zdjęcie ${i + 1} &bull; ${
+              p.source === "galeria" ? "dodano" : "wykonano"
+            } ${escapeHtml(formatPolishTime(p.takenAt || report.time))}</div>
+            ${photoOriginHtml(p)}
           </div>
         </div>`
         )

@@ -38,7 +38,17 @@ export interface PhotoDocumentationItem {
   id: string;
   photoDataUrl: string; // Base64 lub URL zdjęcia
   description: string;
+  /** Moment dodania zdjęcia do raportu — nie to samo, co moment jego wykonania. */
   takenAt: string;
+  /**
+   * Data wykonania odczytana z metadanych EXIF, w czasie lokalnym bez strefy
+   * ("RRRR-MM-DDTGG:MM:SS"). Wypełniana tylko dla zdjęć z galerii i tylko wtedy,
+   * gdy plik naprawdę ją niesie. Zdjęcie prosto z aparatu ma tę datę równą
+   * takenAt, więc nie ma sensu jej dublować.
+   */
+  capturedAt?: string;
+  /** Skąd wzięło się zdjęcie. Brak wartości = starszy raport sprzed tej zmiany. */
+  source?: "aparat" | "galeria";
 }
 
 export type ReportType = 'START_SHIFT' | 'END_SHIFT';

@@ -15,6 +15,7 @@ import {
   AlertTriangle,
   FileText,
   Camera,
+  ImagePlus,
   Image as ImageIcon,
 } from "lucide-react";
 import {
@@ -28,6 +29,7 @@ import {
 import { GeoLocationBadge } from "./GeoLocationBadge";
 import { VoiceInputButton } from "./VoiceInputButton";
 import { saveStoredReport } from "@/lib/storage";
+import { formatDateTaken, readExifDateTaken } from "@/lib/exif";
 import { getPolishCurrentDate, getPolishCurrentTime } from "@/lib/date-utils";
 import { useFormDraft } from "@/lib/use-form-draft";
 import { newPrefixedId } from "@/lib/ids";
@@ -60,7 +62,14 @@ export function EndShiftForm({
   });
 
   const [photos, setPhotos] = useState<PhotoDocumentationItem[]>([]);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  /**
+   * Dwa osobne pola plikowe. `capture="environment"` na jednym z nich każe
+   * systemowi otworzyć od razu tylny aparat — i to samo `capture` odcina
+   * dostęp do galerii, bo telefon pomija wtedy wybór źródła. Jedno pole nie
+   * obsłuży obu dróg, stąd druga referencja.
+   */
+  const cameraInputRef = useRef<HTMLInputElement | null>(null);
+  const galleryInputRef = useRef<HTMLInputElement | null>(null);
 
   const [tempPhotoUrl, setTempPhotoUrl] = useState<string | null>(null);
   const [tempDescription, setTempDescription] = useState("");
@@ -71,6 +80,10 @@ export function EndShiftForm({
   const [emailWarning, setEmailWarning] = useState<string | null>(null);
   const [successReport, setSuccessReport] = useState<DailyReport | null>(null);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  /** Skąd pochodzi zdjęcie właśnie opisywane i kiedy je wykonano (z metadanych). */
+  const [tempSource, setTempSource] = useState<"aparat" | "galeria">("aparat");
+  const [tempCapturedAt, setTempCapturedAt] = useState<string | null>(null);
 
   // Etap 4: automatyczny szkic. Zdjęcia to jedyne dane w tym formularzu,
   // których nie da się odtworzyć z pamięci — wyjście z ekranu kasowało je bez
@@ -115,10 +128,43 @@ export function EndShiftForm({
   const selectedForeman = users.find((u) => u.id === foremanId);
   const selectedSite = sites.find((s) => s.id === siteId);
 
-  const processImageFile = (file: File) => {
+  /**
+   * Zdjęcie z galerii bywa zupełnie inne niż prosto z aparatu: kilkadziesiąt
+   * megapikseli, HEIC z iPhone'a, czasem plik, którego przeglądarka nie umie
+   * zdekodować. Wcześniej taki plik po prostu nic nie robił — `img.onload` nie
+   * odpalał się nigdy i formularz milczał. Stąd obsługa błędów: lepiej napisać,
+   * że się nie udało, niż zostawić człowieka klikającego w martwy guzik.
+   */
+  const processImageFile = (file: File, zrodlo: "aparat" | "galeria") => {
+    setPhotoError(null);
+    setTempSource(zrodlo);
+    setTempCapturedAt(null);
+
+    /*
+     * Datę wykonania czytamy z ORYGINAŁU i tylko dla zdjęć z galerii. Kompresja
+     * niżej przerysowuje zdjęcie na canvasie, co kasuje wszystkie metadane,
+     * a zdjęcie prosto z aparatu i tak powstało przed chwilą.
+     */
+    if (zrodlo === "galeria") {
+      file
+        .arrayBuffer()
+        .then((bufor) => setTempCapturedAt(readExifDateTaken(bufor)))
+        .catch(() => setTempCapturedAt(null));
+    }
+
+    if (!file.type.startsWith("image/")) {
+      setPhotoError("To nie jest plik ze zdjęciem. Wybierz obraz.");
+      return;
+    }
+
     const reader = new FileReader();
+    reader.onerror = () => setPhotoError("Nie udało się odczytać pliku. Spróbuj ponownie.");
     reader.onload = (e) => {
       const img = new Image();
+      img.onerror = () =>
+        setPhotoError(
+          "Nie udało się otworzyć tego zdjęcia. Jeśli pochodzi z galerii, spróbuj zrobić je aparatem."
+        );
       img.onload = () => {
         const canvas = document.createElement("canvas");
         const MAX_WIDTH = 1024;
@@ -146,14 +192,18 @@ export function EndShiftForm({
     reader.readAsDataURL(file);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
+  const handleFileChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    zrodlo: "aparat" | "galeria"
+  ) => {
+    const input = e.target;
+    const files = input.files;
     if (files && files.length > 0) {
-      processImageFile(files[0]);
+      processImageFile(files[0], zrodlo);
     }
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+    // Wyzerowanie pozwala wybrać ten sam plik drugi raz — bez tego przeglądarka
+    // uznaje, że nic się nie zmieniło, i nie odpala zdarzenia.
+    input.value = "";
   };
 
   const handleConfirmAddPhoto = () => {
@@ -163,17 +213,21 @@ export function EndShiftForm({
       photoDataUrl: tempPhotoUrl,
       description: tempDescription.trim() || "Dokumentacja stanu robót na placu budowy.",
       takenAt: new Date().toISOString(),
+      source: tempSource,
+      ...(tempCapturedAt ? { capturedAt: tempCapturedAt } : {}),
     };
 
     setPhotos((prev) => [...prev, newItem]);
     setTempPhotoUrl(null);
     setTempDescription("");
+    setTempCapturedAt(null);
     setIsAddingPhoto(false);
   };
 
   const handleCancelAddPhoto = () => {
     setTempPhotoUrl(null);
     setTempDescription("");
+    setTempCapturedAt(null);
     setIsAddingPhoto(false);
   };
 
@@ -512,24 +566,50 @@ export function EndShiftForm({
               </div>
 
               <input
-                ref={fileInputRef}
+                ref={cameraInputRef}
                 type="file"
                 accept="image/*"
                 capture="environment"
-                onChange={handleFileChange}
+                onChange={(e) => handleFileChange(e, "aparat")}
                 className="hidden"
                 id="camera-file-input"
               />
+              {/* Bez `capture` telefon pokazuje galerię, a komputer zwykłe okno wyboru pliku. */}
+              <input
+                ref={galleryInputRef}
+                type="file"
+                accept="image/*"
+                onChange={(e) => handleFileChange(e, "galeria")}
+                className="hidden"
+                id="gallery-file-input"
+              />
 
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="flex items-center justify-center gap-2.5 px-6 py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-sm sm:text-base font-black shadow-lg shadow-indigo-600/30 active:scale-95 transition-all cursor-pointer self-start sm:self-auto"
-              >
-                <Camera className="w-5 h-5" />
-                <span>Zrób / Dodaj zdjęcie (+)</span>
-              </button>
+              <div className="flex flex-wrap items-center gap-2.5 self-start sm:self-auto">
+                <button
+                  type="button"
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="flex items-center justify-center gap-2.5 px-5 sm:px-6 py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-sm sm:text-base font-black shadow-lg shadow-indigo-600/30 active:scale-95 transition-all cursor-pointer"
+                >
+                  <Camera className="w-5 h-5" />
+                  <span>Zrób zdjęcie</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => galleryInputRef.current?.click()}
+                  className="flex items-center justify-center gap-2.5 px-5 sm:px-6 py-3.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-900 dark:text-white border-2 border-slate-300 dark:border-slate-600 rounded-2xl text-sm sm:text-base font-black active:scale-95 transition-all cursor-pointer"
+                >
+                  <ImagePlus className="w-5 h-5" />
+                  <span>Z galerii</span>
+                </button>
+              </div>
             </div>
+
+            {photoError && (
+              <div className="p-3.5 bg-rose-50 dark:bg-rose-950/50 border-2 border-rose-300 dark:border-rose-800 rounded-2xl text-rose-800 dark:text-rose-200 text-xs sm:text-sm font-bold">
+                {photoError}
+              </div>
+            )}
 
             {/* FORMULARZ DLA NOWEGO ZDJĘCIA */}
             {isAddingPhoto && tempPhotoUrl && (
@@ -563,6 +643,20 @@ export function EndShiftForm({
                       placeholder="Wpisz opis elementu lub użyj dyktowania głosem..."
                       className="w-full p-3.5 bg-white dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 rounded-2xl text-base font-medium text-slate-900 dark:text-white focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none shadow-inner"
                     />
+
+                    {tempSource === "galeria" && (
+                      <p
+                        className={`text-[11px] font-semibold leading-relaxed ${
+                          tempCapturedAt
+                            ? "text-slate-500 dark:text-slate-400"
+                            : "text-amber-700 dark:text-amber-400"
+                        }`}
+                      >
+                        {tempCapturedAt
+                          ? `Zdjęcie z galerii • wykonano ${formatDateTaken(tempCapturedAt)} wg metadanych pliku`
+                          : "Zdjęcie z galerii • plik nie zawiera daty wykonania"}
+                      </p>
+                    )}
                     <div className="flex items-center justify-end gap-3 pt-1">
                       <button
                         type="button"
@@ -592,7 +686,8 @@ export function EndShiftForm({
                   Brak załączonych fotografii.
                 </div>
                 <div className="text-slate-500 text-sm font-medium">
-                  Kliknij przycisk „Zrób / Dodaj zdjęcie (+)”, aby uruchomić aparat smartfona/tabletu.
+                  Użyj przycisku „Zrób zdjęcie”, aby uruchomić aparat, albo „Z galerii”, aby
+                  wybrać zdjęcie zapisane na urządzeniu.
                 </div>
               </div>
             ) : (
@@ -625,8 +720,24 @@ export function EndShiftForm({
                       <p className="text-sm sm:text-base text-slate-900 dark:text-slate-100 font-bold leading-relaxed">
                         {item.description}
                       </p>
-                      <div className="text-xs text-slate-400 mt-2 font-mono font-semibold">
-                        Godzina: {item.takenAt.slice(11, 16)}
+                      <div className="mt-2 space-y-1">
+                        <div className="text-xs text-slate-400 font-mono font-semibold">
+                          {item.source === "galeria" ? "Dodano" : "Godzina"}:{" "}
+                          {item.takenAt.slice(11, 16)}
+                        </div>
+                        {item.source === "galeria" && (
+                          <div
+                            className={`text-[11px] font-semibold leading-relaxed ${
+                              item.capturedAt
+                                ? "text-slate-500 dark:text-slate-400"
+                                : "text-amber-700 dark:text-amber-400"
+                            }`}
+                          >
+                            {item.capturedAt
+                              ? `z galerii • wykonano ${formatDateTaken(item.capturedAt)}`
+                              : "z galerii • brak daty w metadanych"}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
