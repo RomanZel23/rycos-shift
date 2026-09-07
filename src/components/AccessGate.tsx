@@ -125,8 +125,6 @@ export function AccessGate({ onUnlocked }: AccessGateProps) {
           </button>
         </form>
 
-        <SupportContact />
-
         <p className="text-center text-[11px] text-slate-500 px-4 leading-relaxed">
           Kod dostępu chroni raporty z danymi osobowymi pracowników. Nie przekazuj go
           osobom spoza zespołu.
