@@ -546,7 +546,7 @@ export function StartShiftForm({
               <div>
                 <h2 className="text-base sm:text-xl font-black uppercase tracking-tight text-slate-900 dark:text-white flex items-center gap-2.5">
                   <Users className="w-5 h-5 text-sky-600" />
-                  <span>3. Lista obecności i podpisy pracowników</span>
+                  <span>3. Lista obecności </span>
                 </h2>
                 <p className="text-xs sm:text-sm font-semibold text-slate-500 mt-0.5">
                   Każdy uczestnik odprawy musi złożyć podpis palcem/rysikiem
@@ -559,11 +559,10 @@ export function StartShiftForm({
                 <button
                   type="button"
                   onClick={() => setSignatureModalConfig({ isOpen: true, isForeman: true })}
-                  className={`flex items-center gap-2 px-5 py-3.5 rounded-2xl text-sm sm:text-base font-black transition-all active:scale-95 cursor-pointer border-2 shadow-md ${
-                    foremanSigned
-                      ? "bg-emerald-600 text-white border-emerald-500 shadow-emerald-600/30"
-                      : "bg-amber-500 text-slate-950 border-amber-400 hover:bg-amber-400 shadow-amber-500/30 animate-pulse"
-                  }`}
+                  className={`flex items-center gap-2 px-5 py-3.5 rounded-2xl text-sm sm:text-base font-black transition-all active:scale-95 cursor-pointer border-2 shadow-md ${foremanSigned
+                    ? "bg-emerald-600 text-white border-emerald-500 shadow-emerald-600/30"
+                    : "bg-amber-500 text-slate-950 border-amber-400 hover:bg-amber-400 shadow-amber-500/30 animate-pulse"
+                    }`}
                 >
                   <PenTool className="w-5 h-5" />
                   <span>{foremanSigned ? "✓ Brygadzista Podpisany" : "Podpisz Brygadzistę"}</span>
@@ -649,11 +648,10 @@ export function StartShiftForm({
             <button
               type="submit"
               disabled={isSubmitting}
-              className={`w-full py-4.5 sm:py-5 px-8 rounded-3xl font-black text-lg sm:text-xl shadow-2xl flex items-center justify-center gap-3.5 transition-all cursor-pointer active:scale-98 border-2 border-white/20 ${
-                isSubmitting
-                  ? "bg-slate-700 text-slate-300 cursor-wait"
-                  : "bg-gradient-to-r from-sky-600 to-blue-700 hover:from-sky-500 hover:to-blue-600 text-white shadow-sky-600/40"
-              }`}
+              className={`w-full py-4.5 sm:py-5 px-8 rounded-3xl font-black text-lg sm:text-xl shadow-2xl flex items-center justify-center gap-3.5 transition-all cursor-pointer active:scale-98 border-2 border-white/20 ${isSubmitting
+                ? "bg-slate-700 text-slate-300 cursor-wait"
+                : "bg-gradient-to-r from-sky-600 to-blue-700 hover:from-sky-500 hover:to-blue-600 text-white shadow-sky-600/40"
+                }`}
             >
               {isSubmitting ? (
                 <>
