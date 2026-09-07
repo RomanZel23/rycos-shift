@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { MapPin, RefreshCw, CheckCircle2, AlertCircle, ExternalLink } from "lucide-react";
 import { GeoLocationData } from "@/types";
+import { wykryjPlatforme, wskazowkaLokalizacji } from "@/lib/platform";
 
 interface GeoLocationBadgeProps {
   onLocationChange?: (location: GeoLocationData) => void;
@@ -30,6 +31,12 @@ interface GeoLocationBadgeProps {
  * W komunikatach mowa o „ikonie po lewej stronie adresu”, a nie o kłódce:
  * Chrome pokazuje tam suwaki, Safari literki AA, a kłódka została już tylko
  * w części przeglądarek. Opis kształtu szybciej się dezaktualizuje niż miejsce.
+ *
+ * Sama wskazówka jest dobierana do systemu (src/lib/platform.ts), bo droga do
+ * uprawnienia biegnie gdzie indziej na komputerze, gdzie indziej w Safari na
+ * iPadzie, a w aplikacji dodanej do ekranu głównego prowadzi wprost do
+ * Ustawień systemu. Zgłoszone 7 września 2026: brygadzista pracujący na iPadzie
+ * dostawał instrukcję napisaną pod Chrome na komputerze.
  */
 
 /** Dłuższy niż `timeout` poniżej — wchodzi do gry, gdy przeglądarka milczy. */
@@ -48,6 +55,23 @@ export function GeoLocationBadge({ onLocationChange, location }: GeoLocationBadg
   useEffect(() => {
     onLocationChangeRef.current = onLocationChange;
   }, [onLocationChange]);
+
+  /** Wskazówka „jak to odblokować" dopasowana do urządzenia użytkownika. */
+  const wskazowka = useCallback((): string => {
+    if (typeof navigator === "undefined" || typeof window === "undefined") {
+      return wskazowkaLokalizacji("komputer");
+    }
+    const nawigator = navigator as Navigator & { standalone?: boolean };
+    return wskazowkaLokalizacji(
+      wykryjPlatforme({
+        userAgent: nawigator.userAgent,
+        maxTouchPoints: nawigator.maxTouchPoints,
+        standalone:
+          nawigator.standalone === true ||
+          window.matchMedia?.("(display-mode: standalone)").matches === true,
+      })
+    );
+  }, []);
 
   const zatrzymajLicznik = () => {
     if (watchdog.current) {
@@ -81,8 +105,7 @@ export function GeoLocationBadge({ onLocationChange, location }: GeoLocationBadg
       // Wywołanie i tak skończyłoby się błędem bez pokazania monitu.
       setLoading(false);
       setErrorMsg(
-        "Dostęp do lokalizacji jest zablokowany w przeglądarce. Kliknij ikonę po lewej stronie " +
-          "adresu strony, włącz „Lokalizacja”, a potem naciśnij Odśwież."
+        `Dostęp do lokalizacji jest zablokowany. ${wskazowka()} Potem naciśnij Odśwież.`
       );
       return;
     }
@@ -120,8 +143,7 @@ export function GeoLocationBadge({ onLocationChange, location }: GeoLocationBadg
         if (err.code === err.PERMISSION_DENIED) {
           setUprawnienie("odmowa");
           setErrorMsg(
-            "Odmówiono dostępu do lokalizacji. Kliknij ikonę po lewej stronie adresu strony, " +
-              "włącz „Lokalizacja”, a potem naciśnij Odśwież."
+            `Odmówiono dostępu do lokalizacji. ${wskazowka()} Potem naciśnij Odśwież.`
           );
         } else if (err.code === err.POSITION_UNAVAILABLE) {
           setErrorMsg(
@@ -138,7 +160,7 @@ export function GeoLocationBadge({ onLocationChange, location }: GeoLocationBadg
         maximumAge: 60_000,
       }
     );
-  }, [odczytajUprawnienie]);
+  }, [odczytajUprawnienie, wskazowka]);
 
   // Pierwsze pobranie przy wejściu na formularz.
   const pobranoRaz = useRef(false);
