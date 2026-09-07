@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { KeyRound, AlertCircle, ArrowRight, ShieldCheck } from "lucide-react";
+import { SupportContact } from "@/components/SupportContact";
 
 interface AccessGateProps {
   onUnlocked: () => void;
@@ -123,6 +124,8 @@ export function AccessGate({ onUnlocked }: AccessGateProps) {
             {!isLoading && <ArrowRight className="w-4 h-4" />}
           </button>
         </form>
+
+        <SupportContact />
 
         <p className="text-center text-[11px] text-slate-500 px-4 leading-relaxed">
           Kod dostępu chroni raporty z danymi osobowymi pracowników. Nie przekazuj go

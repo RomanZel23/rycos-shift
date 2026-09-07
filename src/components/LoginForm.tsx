@@ -2,6 +2,8 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { BrandLogo } from "./BrandLogo";
+import { SupportContact } from "@/components/SupportContact";
+import { APP_VERSION } from "@/lib/version";
 import { User as UserType, TenantSettings } from "@/types";
 import {
   Lock,
@@ -387,6 +389,8 @@ export function LoginForm({ settings, onLogin }: LoginFormProps) {
               blokowane na 15 minut.
             </span>
           </div>
+
+          <SupportContact />
         </div>
 
         {/* STOPKA SYSTEMOWA */}
@@ -395,7 +399,7 @@ export function LoginForm({ settings, onLogin }: LoginFormProps) {
             {settings?.organizationName || "iDream Business Center"} •{" "}
             {settings?.logoSubtitle || "SolutionsBay Sp. z o.o."}
           </div>
-          <div className="font-mono text-[11px] text-slate-600">RYCOS Shift v1.4</div>
+          <div className="font-mono text-[11px] text-slate-600">RYCOS Shift v{APP_VERSION}</div>
         </div>
       </div>
     </div>
