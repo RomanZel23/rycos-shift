@@ -193,20 +193,41 @@ export function ReportArchive({
    * Wcześniej każde kliknięcie „Pobierz" tworzyło dokument od nowa z danych
    * raportu. Dla protokołu z podpisami to problem dowodowy — pobrany PDF mógł
    * różnić się od tego, który poszedł mailem i został podpisany w terenie.
+   *
+   * Wyjątek (zgłoszenie z 8 września 2026): raport dosłany z kolejki offline
+   * nigdy nie dostał dokumentu, bo renderuje go endpoint, który wtedy nie
+   * odpowiedział. Taki raport odsyłamy na serwer, on składa PDF z zapisanych
+   * danych i archiwizuje go — od następnego razu droga jest już zwykła.
+   * Wcześniej kończyło się to komunikatem „brak pliku PDF" bez wyjścia.
    */
   const handleDownload = async (report: DailyReport) => {
-    if (!report.pdfDataUrl) {
-      setResendStatus({
-        id: report.id,
-        success: false,
-        message: "Ten raport nie ma zarchiwizowanego pliku PDF.",
-      });
-      return;
-    }
     try {
-      const res = await fetch(report.pdfDataUrl);
-      if (!res.ok) throw new Error(String(res.status));
-      const blob = await res.blob();
+      let blob: Blob;
+
+      if (report.pdfDataUrl) {
+        const res = await fetch(report.pdfDataUrl);
+        if (!res.ok) throw new Error(String(res.status));
+        blob = await res.blob();
+      } else {
+        const res = await fetch("/api/reports/pdf", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reportId: report.id }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => null);
+          setResendStatus({
+            id: report.id,
+            success: false,
+            message: data?.message || "Nie udało się złożyć dokumentu PDF.",
+          });
+          return;
+        }
+        blob = await res.blob();
+        // Dokument trafił właśnie do archiwum — odświeżamy, żeby lista o tym wiedziała.
+        onRefresh?.();
+      }
+
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
