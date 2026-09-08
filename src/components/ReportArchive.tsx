@@ -634,10 +634,16 @@ export function ReportArchive({
                     <span className="text-slate-400 font-bold block">
                       {isStart ? "Obecnych pracowników:" : "Załączonych zdjęć:"}
                     </span>
+                    {/*
+                      Sama liczba, bez rzeczownika. Polska odmiana przez liczebniki
+                      („1 osoba", „2 osoby", „5 osób") wymagałaby trzech form i tak
+                      czy inaczej myliłaby się przy 22 albo 112. Etykieta obok mówi,
+                      czego liczba dotyczy, więc rzeczownik i tak niczego nie wnosił.
+                    */}
                     <span className="font-extrabold text-slate-800 dark:text-slate-200 block">
                       {isStart
-                        ? `${report.attendanceList?.length || 0} osób z podpisem`
-                        : `${report.photoDocumentation?.length || 0} fotografii`}
+                        ? report.attendanceList?.length || 0
+                        : report.photoDocumentation?.length || 0}
                     </span>
                   </div>
 
@@ -741,6 +747,14 @@ export function ReportArchive({
                     <DeliveryStatus report={previewReport} />
                   </div>
                 </div>
+                {/*
+                  To pole jest ZAPISEM, kto dostał wiadomość, a nie listą adresów
+                  do wysyłki. Lista odbiorców zawsze pochodzi z Ustawień w bazie
+                  (tenant_settings) i jest odczytywana dopiero w chwili wysyłki —
+                  klient nigdy jej nie podaje. Dawne „Brak zapisanych odbiorców"
+                  przy raporcie, który nigdy nie poszedł mailem, czytało się jak
+                  informacja o pustej konfiguracji i wyprowadzało na manowce.
+                */}
                 <div className="min-w-0">
                   <div className="text-xs text-slate-400">Odbiorcy:</div>
                   {previewReport.sentToEmails && previewReport.sentToEmails.length > 0 ? (
@@ -756,8 +770,9 @@ export function ReportArchive({
                       ))}
                     </ul>
                   ) : (
-                    <div className="text-xs text-slate-500 mt-0.5">
-                      Brak zapisanych odbiorców
+                    <div className="text-xs text-slate-500 mt-0.5 leading-relaxed">
+                      Raport nie został jeszcze wysłany. Odbiorcy zostaną pobrani z Ustawień
+                      przy wysyłce.
                     </div>
                   )}
                 </div>
