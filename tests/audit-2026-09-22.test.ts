@@ -45,3 +45,12 @@ test("limiter bierze adres dopisany przez Traefika, a nie podany przez klienta",
   assert.equal(clientIpFromHeaders(h({ "x-real-ip": "83.10.20.30" })), "83.10.20.30");
   assert.equal(clientIpFromHeaders(h({})), "unknown");
 });
+
+test("adres akceptującego: normalizacja i walidacja", async () => {
+  const { isValidEmail, normalizeEmail } = await import("@/lib/email-address");
+  assert.equal(normalizeEmail("  Kierownik@Firma.PL "), "kierownik@firma.pl");
+  assert.ok(isValidEmail("kierownik@firma.pl"));
+  assert.ok(!isValidEmail("kierownik@firma"));
+  assert.ok(!isValidEmail(""));
+  assert.ok(!isValidEmail(normalizeEmail(undefined)));
+});

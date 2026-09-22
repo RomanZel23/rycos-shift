@@ -1,4 +1,9 @@
-import { AttendanceRecord, GeoLocationData, PhotoDocumentationItem } from "@/types";
+import {
+  AttendanceRecord,
+  ChangeSection,
+  GeoLocationData,
+  PhotoDocumentationItem,
+} from "@/types";
 
 /**
  * Etap 4 — szkice formularzy w IndexedDB.
@@ -26,7 +31,7 @@ const STORE = "drafts";
 /** Po tylu dniach szkic uznajemy za porzucony i kasujemy przy starcie. */
 const MAX_AGE_DAYS = 7;
 
-export type DraftKind = "START_SHIFT" | "END_SHIFT";
+export type DraftKind = "START_SHIFT" | "END_SHIFT" | "PROJECT_CHANGE";
 
 export interface StartShiftDraft {
   /** Identyfikator raportu — ten sam przy każdej próbie wysyłki tego formularza. */
@@ -51,7 +56,21 @@ export interface EndShiftDraft {
   photos: PhotoDocumentationItem[];
 }
 
-export type DraftPayload = StartShiftDraft | EndShiftDraft;
+/** Nowa karta zmiany w projekcie (edycji wysłanej karty nie szkicujemy). */
+export interface ProjectChangeDraft {
+  changeId: string;
+  /** Klucz próby wysyłki — ten sam do skutku, patrz POST /api/changes. */
+  sendKey: string;
+  siteId: string;
+  location: GeoLocationData;
+  name: string;
+  current: ChangeSection;
+  target: ChangeSection;
+  knaRequired: boolean;
+  excludedAcceptorIds: string[];
+}
+
+export type DraftPayload = StartShiftDraft | EndShiftDraft | ProjectChangeDraft;
 
 interface DraftRecord {
   kind: DraftKind;
@@ -141,6 +160,16 @@ export async function clearDraft(kind: DraftKind): Promise<void> {
 
 /** Czy szkic zawiera cokolwiek wartego przywracania. */
 export function draftHasContent(kind: DraftKind, payload: DraftPayload): boolean {
+  if (kind === "PROJECT_CHANGE") {
+    const c = payload as ProjectChangeDraft;
+    return Boolean(
+      (c.name || "").trim() ||
+        (c.current?.description || "").trim() ||
+        (c.target?.description || "").trim() ||
+        (c.current?.photos || []).length ||
+        (c.target?.photos || []).length
+    );
+  }
   if (kind === "END_SHIFT") {
     return ((payload as EndShiftDraft).photos || []).length > 0;
   }

@@ -18,6 +18,9 @@ export interface AuthUser {
   isAdmin: boolean;
   login: string;
   sessionEpoch: number;
+  /** Kompetencja „Akceptacja zmian w projekcie". */
+  canAcceptChanges: boolean;
+  email: string;
 }
 
 export interface AuthContext {
@@ -26,8 +29,13 @@ export interface AuthContext {
   refreshedToken?: string;
 }
 
-const USER_COLUMNS =
-  "id, first_name, last_name, role, is_foreman, is_admin, login, session_epoch";
+/**
+ * `*` zamiast listy kolumn: nowe kolumny (np. can_accept_changes z migracji
+ * 0006) nie mogą wywracać uwierzytelniania, jeśli kod trafi na produkcję
+ * przed migracją — wtedy pole jest po prostu puste. Hashe haseł nie opuszczają
+ * serwera: mapUser przepisuje wyłącznie pola poniżej.
+ */
+const USER_COLUMNS = "*";
 
 function mapUser(row: Record<string, unknown>): AuthUser {
   return {
@@ -39,6 +47,8 @@ function mapUser(row: Record<string, unknown>): AuthUser {
     isAdmin: Boolean(row.is_admin),
     login: String(row.login ?? ""),
     sessionEpoch: Number(row.session_epoch ?? 0),
+    canAcceptChanges: Boolean(row.can_accept_changes),
+    email: typeof row.email === "string" ? row.email : "",
   };
 }
 

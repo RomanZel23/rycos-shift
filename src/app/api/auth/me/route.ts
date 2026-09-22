@@ -14,7 +14,21 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ success: true, user: null });
   }
   return withRefreshedSession(
-    NextResponse.json({ success: true, user: context.user }),
+    // sessionEpoch i e-mail to sprawy serwera — przeglądarka ich nie potrzebuje.
+    NextResponse.json({
+      success: true,
+      user: {
+        id: context.user.id,
+        firstName: context.user.firstName,
+        lastName: context.user.lastName,
+        role: context.user.role,
+        isForeman: context.user.isForeman,
+        isAdmin: context.user.isAdmin,
+        login: context.user.login,
+        canAcceptChanges: context.user.canAcceptChanges,
+        createdAt: "",
+      },
+    }),
     context
   );
 }

@@ -123,9 +123,8 @@ export async function POST(req: NextRequest) {
 
   const query = supabase
     .from("users")
-    .select(
-      "id, first_name, last_name, role, is_foreman, is_admin, login, password_hash, pin_hash, failed_login_attempts, locked_until, session_epoch"
-    );
+    // `*` — patrz komentarz przy USER_COLUMNS w src/lib/auth.ts.
+    .select("*");
 
   const { data: row } = await (mode === "pin"
     ? query.eq("id", userId).maybeSingle()
@@ -225,6 +224,7 @@ export async function POST(req: NextRequest) {
       isForeman: row.is_foreman,
       isAdmin: row.is_admin,
       login: row.login,
+      canAcceptChanges: Boolean(row.can_accept_changes),
       createdAt: "",
     },
   });

@@ -18,8 +18,12 @@ import { SESSION_COOKIE, readSessionToken } from "@/lib/session";
  * (funkcja `proxy`, domyślnie runtime Node.js).
  */
 
-/** Poza bramką urządzenia i poza sesją. */
-const PUBLIC_API_PATHS = ["/api/gate", "/api/health"];
+/**
+ * Poza bramką urządzenia i poza sesją.
+ * /api/changes/link — wejście akceptującego z linku w mailu (link + PIN);
+ * zabezpieczenie jest w samym endpoincie.
+ */
+const PUBLIC_API_PATHS = ["/api/gate", "/api/health", "/api/changes/link"];
 
 /** Za bramką urządzenia, ale bez wymogu sesji — inaczej nie dałoby się zalogować. */
 const GATE_ONLY_API_PATHS = [

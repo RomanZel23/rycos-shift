@@ -18,6 +18,8 @@ import {
   dailyReportToRow,
 } from "@/lib/report-mapper";
 import { forbidden, requireUser, withRefreshedSession } from "@/lib/auth";
+import { isValidEmail, normalizeEmail } from "@/lib/email-address";
+import { isAcceptorOnly } from "@/lib/project-change";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -83,6 +85,9 @@ export async function GET(req: NextRequest) {
     ]);
 
     // Mapowanie tabeli users
+    // Adres e-mail akceptującego to dana osobowa potrzebna wyłącznie
+    // administratorowi — brygadzista dostaje samą flagę kompetencji.
+    const isAdmin = auth.context.user.isAdmin;
     const users: User[] = (usersRes.data || []).map((row) => ({
       id: row.id,
       firstName: row.first_name,
@@ -92,6 +97,8 @@ export async function GET(req: NextRequest) {
       isAdmin: row.is_admin,
       login: row.login,
       createdAt: row.created_at,
+      canAcceptChanges: Boolean(row.can_accept_changes),
+      ...(isAdmin ? { email: row.email || "" } : {}),
     }));
 
     // Mapowanie placów budowy
@@ -120,15 +127,20 @@ export async function GET(req: NextRequest) {
         logoSubtitle: s.logo_subtitle,
         startShiftEmailRecipients: s.start_shift_email_recipients || [],
         endShiftEmailRecipients: s.end_shift_email_recipients || [],
+        changeEmailRecipients: Array.isArray(s.change_email_recipients)
+          ? s.change_email_recipients
+          : [],
         resendFromEmail: s.resend_from_email,
       };
     }
 
     // Mapowanie raportów — cała logika (ścieżka w buckecie -> /api/files)
     // siedzi w report-mapper, żeby był jeden punkt prawdy dla wszystkich route'ów.
-    const reports: DailyReport[] = ((reportsRes.data || []) as unknown as ReportRow[]).map(
-      rowToDailyReport
-    );
+    // Akceptujący bez uprawnień brygadzisty/admina nie dostaje raportów
+    // dziennych — nie dotyczą go (widzi tylko rejestr zmian).
+    const reports: DailyReport[] = isAcceptorOnly(auth.context.user)
+      ? []
+      : ((reportsRes.data || []) as unknown as ReportRow[]).map(rowToDailyReport);
 
     // Mapowanie szablonów PDF
     const pdfTemplates: PdfTemplate[] = (templatesRes.data || []).map((row) => ({
@@ -273,8 +285,24 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const mapped = (users as User[])
-        .filter((u) => typeof u?.id === "string" && u.id)
+      const lista = (users as User[]).filter((u) => typeof u?.id === "string" && u.id);
+
+      // Akceptujący bez adresu nie dostałby żadnej karty — to błąd konfiguracji,
+      // a nie coś, co ma przejść po cichu.
+      const bezAdresu = lista.find(
+        (u) => u.canAcceptChanges && !isValidEmail(normalizeEmail(u.email))
+      );
+      if (bezAdresu) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `${bezAdresu.firstName} ${bezAdresu.lastName}: kompetencja „Akceptacja zmian w projekcie" wymaga poprawnego adresu e-mail.`,
+          },
+          { status: 400 }
+        );
+      }
+
+      const mapped = lista
         .map((u) => ({
           id: u.id,
           first_name: u.firstName,
@@ -285,6 +313,13 @@ export async function POST(req: NextRequest) {
           // Pusty login łamałby unikalny indeks na lower(login) przy drugim
           // koncie bez loginu — w bazie ma być wtedy NULL.
           login: typeof u.login === "string" && u.login.trim() ? u.login.trim() : null,
+          // Oba pola tylko wtedy, gdy przyszły. Lista z pamięci przeglądarki
+          // sprzed wdrożenia ich nie zna — brak pola nie może kasować
+          // kompetencji ani adresu ustawionych na innym urządzeniu.
+          ...(u.canAcceptChanges !== undefined
+            ? { can_accept_changes: Boolean(u.canAcceptChanges) }
+            : {}),
+          ...(u.email !== undefined ? { email: normalizeEmail(u.email) || null } : {}),
         }));
 
       if (mapped.length > 0) {
@@ -363,6 +398,10 @@ export async function POST(req: NextRequest) {
           logo_subtitle: settings.logoSubtitle,
           start_shift_email_recipients: settings.startShiftEmailRecipients,
           end_shift_email_recipients: settings.endShiftEmailRecipients,
+          // Pole tylko wtedy, gdy przyszło — stary cache ustawień go nie zna.
+          ...(Array.isArray(settings.changeEmailRecipients)
+            ? { change_email_recipients: settings.changeEmailRecipients }
+            : {}),
           resend_from_email: settings.resendFromEmail,
           updated_at: new Date().toISOString(),
         },

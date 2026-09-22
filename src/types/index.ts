@@ -9,6 +9,13 @@ export interface User {
   isAdmin: boolean;
   login: string;
   createdAt: string;
+  /** Kompetencja „Akceptacja zmian w projekcie" (trzeci workflow). */
+  canAcceptChanges?: boolean;
+  /**
+   * Adres, na który idą karty zmian do akceptacji. Wymagany przy kompetencji
+   * akceptacji. Serwer oddaje go wyłącznie administratorowi.
+   */
+  email?: string;
 }
 
 export interface ConstructionSite {
@@ -105,6 +112,8 @@ export interface TenantSettings {
   logoSubtitle: string; // "RYCOS Shift"
   startShiftEmailRecipients: string[];
   endShiftEmailRecipients: string[];
+  /** Odbiorcy karty zmiany z kompletem decyzji (PDF z podpisami). */
+  changeEmailRecipients?: string[];
   // Klucz Resend NIE jest już częścią ustawień aplikacji — od Etapu 2 żyje
   // wyłącznie w zmiennej środowiskowej RESEND_API_KEY po stronie serwera.
   resendFromEmail?: string;
@@ -119,4 +128,66 @@ export interface PdfTemplate {
   htmlContent: string;
   active: boolean;
   updatedAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// Rejestr zmian w projekcie (trzeci workflow)
+// ---------------------------------------------------------------------------
+
+/** Zdjęcie w sekcji „Jest" / „Powinno być". */
+export interface ChangePhoto {
+  id: string;
+  /** Ścieżka w buckecie — po udanym wgraniu. */
+  path?: string;
+  /** Zdjęcie jeszcze niewgrane (offline) — tylko po stronie urządzenia. */
+  dataUrl?: string;
+  takenAt: string;
+  source?: "aparat" | "galeria";
+  capturedAt?: string;
+}
+
+export interface ChangeSection {
+  description: string;
+  photos: ChangePhoto[];
+}
+
+export type ChangeStatus = "PENDING" | "ACCEPTED" | "REJECTED" | "DISPUTED";
+export type ChangeDecisionValue = "PENDING" | "ACCEPTED" | "REJECTED" | "SUPERSEDED";
+
+export interface ChangeDecision {
+  id: string;
+  version: number;
+  acceptorId: string;
+  acceptorName: string;
+  decision: ChangeDecisionValue;
+  comment?: string;
+  /** Adres /api/files — tylko gdy decyzja podpisana. */
+  signatureUrl?: string;
+  decidedAt?: string;
+  emailSentAt?: string;
+  emailError?: string;
+}
+
+export interface ProjectChange {
+  id: string;
+  number: string;
+  siteId: string;
+  siteName: string;
+  location: GeoLocationData;
+  name: string;
+  current: ChangeSection;
+  target: ChangeSection;
+  knaRequired: boolean;
+  status: ChangeStatus;
+  version: number;
+  authorId: string;
+  authorName: string;
+  submittedAt: string;
+  versionSentAt: string;
+  lockedAt?: string;
+  completedAt?: string;
+  /** Decyzje BIEŻĄCEJ wersji. */
+  decisions: ChangeDecision[];
+  /** Decyzje oddane dla wcześniejszych wersji — historia. */
+  history: ChangeDecision[];
 }

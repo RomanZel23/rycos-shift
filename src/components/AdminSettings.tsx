@@ -24,6 +24,7 @@ import {
   TenantSettings,
 } from "@/types";
 import { removePolishDiacritics } from "@/lib/pdf-generator";
+import { isValidEmail, normalizeEmail } from "@/lib/email-address";
 
 interface AdminSettingsProps {
   users: User[];
@@ -87,7 +88,16 @@ export function AdminSettings({
     isForeman: false,
     isAdmin: false,
     login: "",
+    canAcceptChanges: false,
+    email: "",
   });
+
+  // Edycja kompetencji istniejącego użytkownika (akceptacja zmian + e-mail).
+  const [competenceEdit, setCompetenceEdit] = useState<{
+    id: string;
+    canAcceptChanges: boolean;
+    email: string;
+  } | null>(null);
 
   // Stan nowego placu budowy
   const [newSiteName, setNewSiteName] = useState("");
@@ -103,6 +113,9 @@ export function AdminSettings({
   );
   const [endEmails, setEndEmails] = useState(
     settings.endShiftEmailRecipients.join(", ")
+  );
+  const [changeEmails, setChangeEmails] = useState(
+    (settings.changeEmailRecipients || []).join(", ")
   );
   const [resendFromEmail, setResendFromEmail] = useState(
     settings.resendFromEmail || "raporty@shift.rycos.eu"
@@ -197,6 +210,12 @@ export function AdminSettings({
     e.preventDefault();
     if (!newUser.firstName.trim() || !newUser.lastName.trim()) return;
 
+    const email = normalizeEmail(newUser.email);
+    if (newUser.canAcceptChanges && !isValidEmail(email)) {
+      alert("Kompetencja „Akceptacja zmian w projekcie” wymaga poprawnego adresu e-mail.");
+      return;
+    }
+
     const created: User = {
       id: "usr-" + Date.now(),
       firstName: newUser.firstName.trim(),
@@ -206,6 +225,8 @@ export function AdminSettings({
       isAdmin: newUser.isAdmin,
       login: newUser.login.trim() || defaultLogin(newUser.firstName, newUser.lastName),
       createdAt: new Date().toISOString(),
+      canAcceptChanges: newUser.canAcceptChanges,
+      email: newUser.canAcceptChanges ? email : "",
     };
 
     // Unikalny indeks w bazie odrzuciłby cały zapis listy — lepiej powiedzieć
@@ -229,10 +250,40 @@ export function AdminSettings({
       isForeman: false,
       isAdmin: false,
       login: "",
+      canAcceptChanges: false,
+      email: "",
     });
     triggerSaveBanner(
       "Użytkownik dodany. Nadaj mu hasło lub PIN przyciskiem „Poświadczenia” — bez tego się nie zaloguje."
     );
+  };
+
+  const handleSaveCompetence = () => {
+    if (!competenceEdit) return;
+    const email = normalizeEmail(competenceEdit.email);
+    if (email && !isValidEmail(email)) {
+      alert("Adres e-mail jest niepoprawny.");
+      return;
+    }
+    if (competenceEdit.canAcceptChanges && !isValidEmail(email)) {
+      alert("Kompetencja „Akceptacja zmian w projekcie” wymaga poprawnego adresu e-mail.");
+      return;
+    }
+    onUpdateUsers(
+      users.map((u) =>
+        u.id === competenceEdit.id
+          ? {
+              ...u,
+              canAcceptChanges: competenceEdit.canAcceptChanges,
+              // Adres zostaje zapamiętany także po odebraniu kompetencji —
+              // przy ponownym nadaniu nie trzeba go wpisywać od nowa.
+              email: email,
+            }
+          : u
+      )
+    );
+    setCompetenceEdit(null);
+    triggerSaveBanner("Kompetencje użytkownika zapisane.");
   };
 
   const handleDeleteUser = async (userId: string) => {
@@ -320,8 +371,14 @@ export function AdminSettings({
       .map((e) => e.trim())
       .filter((e) => e.length > 0);
 
+    const changeList = changeEmails
+      .split(",")
+      .map((e) => e.trim())
+      .filter((e) => e.length > 0);
+
     const updatedSettings: TenantSettings = {
       ...settings,
+      changeEmailRecipients: changeList,
       organizationName: orgName.trim() || settings.organizationName,
       logoText: logoText.trim() || settings.logoText,
       startShiftEmailRecipients: startList,
@@ -485,7 +542,7 @@ export function AdminSettings({
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
-              <div className="flex items-center gap-6">
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
                 <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-slate-800 dark:text-slate-200">
                   <input
                     type="checkbox"
@@ -505,6 +562,18 @@ export function AdminSettings({
                   />
                   <span>Administrator Systemu</span>
                 </label>
+
+                <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-slate-800 dark:text-slate-200">
+                  <input
+                    type="checkbox"
+                    checked={newUser.canAcceptChanges}
+                    onChange={(e) =>
+                      setNewUser({ ...newUser, canAcceptChanges: e.target.checked })
+                    }
+                    className="w-5 h-5 rounded-lg border-slate-400 text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <span>Akceptacja zmian w projekcie</span>
+                </label>
               </div>
 
               <button
@@ -514,14 +583,32 @@ export function AdminSettings({
                 Dodaj pracownika
               </button>
             </div>
+
+            {newUser.canAcceptChanges && (
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Adres mailowy (karty zmian do akceptacji): <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  required
+                  inputMode="email"
+                  autoComplete="off"
+                  placeholder="np. kierownik@firma.pl"
+                  value={newUser.email}
+                  onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                  className="w-full sm:max-w-md h-12 px-3.5 bg-slate-50 dark:bg-slate-800 border-2 border-emerald-300 dark:border-emerald-800 rounded-2xl text-sm font-semibold text-slate-900 dark:text-white"
+                />
+              </div>
+            )}
           </form>
 
           {/* LISTA UŻYTKOWNIKÓW */}
           <div className="bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden shadow-sm">
             <div className="divide-y-2 divide-slate-100 dark:divide-slate-800">
               {users.map((u) => (
+                <React.Fragment key={u.id}>
                 <div
-                  key={u.id}
                   className="p-4 sm:p-5 flex items-center justify-between gap-4 hover:bg-slate-50 dark:hover:bg-slate-800/50"
                 >
                   <div className="flex items-center gap-3.5">
@@ -552,12 +639,38 @@ export function AdminSettings({
                             BRYGADZISTA
                           </span>
                         )}
+                        {u.canAcceptChanges && (
+                          <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 text-xs font-black rounded-lg">
+                            AKCEPTACJA ZMIAN
+                          </span>
+                        )}
                       </div>
-                      <div className="text-xs text-slate-500 font-semibold">{u.role}</div>
+                      <div className="text-xs text-slate-500 font-semibold">
+                        {u.role}
+                        {u.email ? ` · ${u.email}` : ""}
+                      </div>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCompetenceEdit(
+                          competenceEdit?.id === u.id
+                            ? null
+                            : {
+                                id: u.id,
+                                canAcceptChanges: Boolean(u.canAcceptChanges),
+                                email: u.email || "",
+                              }
+                        )
+                      }
+                      title="Kompetencje: akceptacja zmian w projekcie"
+                      className="px-3 py-2 text-xs font-black text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/60 hover:bg-emerald-200 dark:hover:bg-emerald-900 rounded-xl transition-colors cursor-pointer"
+                    >
+                      Kompetencje
+                    </button>
                     <button
                       type="button"
                       onClick={() => {
@@ -588,6 +701,73 @@ export function AdminSettings({
                     </button>
                   </div>
                 </div>
+
+                {competenceEdit?.id === u.id && (
+                  <div className="px-4 sm:px-5 pb-5 pt-1 bg-emerald-50/60 dark:bg-emerald-950/20 space-y-3">
+                    <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-slate-800 dark:text-slate-200">
+                      <input
+                        type="checkbox"
+                        checked={competenceEdit.canAcceptChanges}
+                        onChange={(e) =>
+                          setCompetenceEdit({
+                            ...competenceEdit,
+                            canAcceptChanges: e.target.checked,
+                          })
+                        }
+                        className="w-5 h-5 rounded-lg border-slate-400 text-emerald-600 focus:ring-emerald-500"
+                      />
+                      <span>Akceptacja zmian w projekcie</span>
+                    </label>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                          Adres mailowy:{" "}
+                          {competenceEdit.canAcceptChanges ? (
+                            <span className="text-rose-500">*</span>
+                          ) : (
+                            <span className="font-semibold text-slate-500">
+                              (opcjonalnie — powiadomienia o decyzjach w kartach, które ta osoba zgłosi)
+                            </span>
+                          )}
+                        </label>
+                        <input
+                          type="email"
+                          inputMode="email"
+                          autoComplete="off"
+                          placeholder="np. kierownik@firma.pl"
+                          value={competenceEdit.email}
+                          onChange={(e) =>
+                            setCompetenceEdit({ ...competenceEdit, email: e.target.value })
+                          }
+                          className="w-full sm:max-w-md h-11 px-3.5 bg-white dark:bg-slate-800 border-2 border-emerald-300 dark:border-emerald-800 rounded-2xl text-sm font-semibold text-slate-900 dark:text-white"
+                        />
+                        {competenceEdit.canAcceptChanges && (
+                          <p className="mt-1.5 text-xs text-slate-500 font-semibold">
+                            Akceptujący wchodzi do aplikacji przez link z maila i swój PIN — nadaj mu
+                            PIN przyciskiem „Poświadczenia”.
+                          </p>
+                        )}
+                      </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={handleSaveCompetence}
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl cursor-pointer"
+                      >
+                        Zapisz kompetencje
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCompetenceEdit(null)}
+                        className="px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-black text-xs rounded-xl cursor-pointer"
+                      >
+                        Anuluj
+                      </button>
+                    </div>
+                  </div>
+                )}
+                </React.Fragment>
               ))}
             </div>
           </div>
@@ -796,6 +976,22 @@ export function AdminSettings({
                 placeholder="raporty-koniec@solutionsbay.pl, zarzad@solutionsbay.pl"
                 className="w-full h-12 px-4 bg-slate-50 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 rounded-2xl text-sm font-semibold"
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-extrabold text-slate-800 dark:text-slate-200 mb-1.5">
+                Odbiorcy kart zmian w projekcie po komplecie decyzji (oddziel przecinkami):
+              </label>
+              <input
+                type="text"
+                value={changeEmails}
+                onChange={(e) => setChangeEmails(e.target.value)}
+                placeholder="kierownik.budowy@solutionsbay.pl, biuro.projektowe@solutionsbay.pl"
+                className="w-full h-12 px-4 bg-slate-50 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 rounded-2xl text-sm font-semibold"
+              />
+              <p className="mt-1 text-xs text-slate-500 font-semibold">
+                Akceptujący dostają karty imiennie — ta lista dostaje PDF z kompletem decyzji i podpisów.
+              </p>
             </div>
 
             {/* Klucz API Resend nie ma tu żadnego pola ani opisu: od Etapu 2

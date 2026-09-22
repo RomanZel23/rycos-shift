@@ -44,3 +44,4 @@ next-env.d.ts
 # local credentials
 keys.txt
 *.local
+/Claude outputs/

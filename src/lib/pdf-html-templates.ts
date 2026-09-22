@@ -479,3 +479,250 @@ export function generateEndShiftHtml(
     ${renderClosing()}
   `, fontCss);
 }
+
+// ---------------------------------------------------------------------------
+// Karta zmiany w projekcie (trzeci workflow)
+// ---------------------------------------------------------------------------
+
+function changeStyles(): string {
+  return `
+    .change-name {
+      font-size: 15px;
+      font-weight: 800;
+      color: #0f172a;
+      margin: 0 0 10px;
+    }
+    .kna {
+      border: 2px solid #dc2626;
+      background-color: #fef2f2;
+      color: #991b1b;
+      border-radius: 7px;
+      padding: 8px 12px;
+      font-weight: 800;
+      font-size: 11px;
+      margin-bottom: 12px;
+      break-inside: avoid;
+    }
+    .kna small { display: block; font-weight: 600; font-size: 9.5px; margin-top: 2px; }
+    .kna-no { font-size: 10px; color: #475569; margin-bottom: 12px; }
+    .section-desc {
+      white-space: pre-wrap;
+      background-color: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 9px 11px;
+      font-size: 11px;
+      margin-bottom: 10px;
+    }
+    .muted { font-size: 10.5px; color: #64748b; }
+    table.decisions {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid #cbd5e1;
+    }
+    table.decisions thead { display: table-header-group; }
+    table.decisions tr { break-inside: avoid; page-break-inside: avoid; }
+    table.decisions th {
+      background-color: #0f172a;
+      color: #ffffff;
+      font-size: 9px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 7px 8px;
+      text-align: left;
+    }
+    table.decisions td {
+      padding: 6px 8px;
+      border-top: 1px solid #e2e8f0;
+      font-size: 10.5px;
+      vertical-align: middle;
+    }
+    table.decisions td:first-child, table.decisions th:first-child { width: 28px; text-align: center; }
+    table.decisions .when { font-family: ${FONT_MONO}; font-size: 9px; color: #475569; width: 92px; }
+    table.decisions .sig { width: 128px; }
+    table.decisions .sig img { display: block; max-height: 30px; max-width: 118px; object-fit: contain; }
+    .dec-ACCEPTED { color: #047857; font-weight: 800; }
+    .dec-REJECTED { color: #b91c1c; font-weight: 800; }
+    .dec-PENDING { color: #b45309; font-weight: 700; }
+    .dec-SUPERSEDED { color: #64748b; }
+    .status-line {
+      margin-top: 10px;
+      font-size: 11px;
+      font-weight: 800;
+      break-inside: avoid;
+    }
+  `;
+}
+
+export interface ChangePdfInput {
+  change: import("@/types").ProjectChange;
+  /** id zdjęcia -> data URL */
+  photoData: Record<string, string>;
+  /** id decyzji -> data URL podpisu */
+  signatureData: Record<string, string>;
+  statusLabel: string;
+  decisionLabel: (d: import("@/types").ChangeDecisionValue) => string;
+}
+
+function formatWarsawDateTime(iso?: string): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat("pl-PL", {
+    timeZone: "Europe/Warsaw",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(d);
+}
+
+function changePhotosHtml(
+  photos: import("@/types").ChangePhoto[],
+  photoData: Record<string, string>,
+  label: string
+): string {
+  if (!photos.length) return `<div class="muted">Brak zdjęć w sekcji „${escapeHtml(label)}”.</div>`;
+  return `<div class="photo-grid">${photos
+    .map((p, i) => {
+      const src = photoData[p.id] || "";
+      const wykonano = formatDateTaken(p.capturedAt);
+      const origin =
+        p.source === "galeria"
+          ? `<div class="origin">${
+              wykonano
+                ? `z galerii &bull; wykonano ${escapeHtml(wykonano)} wg metadanych pliku`
+                : "z galerii &bull; brak daty wykonania w metadanych pliku"
+            }</div>`
+          : "";
+      return `
+        <div class="photo-card">
+          <div class="frame">${src ? `<img src="${escapeHtml(src)}" alt="${escapeHtml(label)} ${i + 1}" />` : ""}</div>
+          <div class="caption">
+            <div class="when">${escapeHtml(label)} &bull; zdjęcie ${i + 1} &bull; ${escapeHtml(
+              formatWarsawDateTime(p.takenAt)
+            )}</div>
+            ${origin}
+          </div>
+        </div>`;
+    })
+    .join("")}</div>`;
+}
+
+/** Karta zmiany: treść obu sekcji + decyzje akceptujących z podpisami. */
+export function generateProjectChangeHtml(input: ChangePdfInput, fontCss = ""): string {
+  const { change, photoData, signatureData } = input;
+  const lat = change.location?.latitude;
+  const lng = change.location?.longitude;
+  const gps =
+    typeof lat === "number" && typeof lng === "number"
+      ? `${lat.toFixed(6)}, ${lng.toFixed(6)}`
+      : "Brak odczytu GPS";
+
+  const decisionRows = (list: import("@/types").ChangeDecision[], withSig: boolean) =>
+    list.length
+      ? list
+          .map(
+            (d, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td><strong>${escapeHtml(d.acceptorName)}</strong>${
+              d.version !== change.version ? ` <span class="muted">(wersja ${d.version})</span>` : ""
+            }</td>
+          <td class="dec-${d.decision}">${escapeHtml(input.decisionLabel(d.decision))}</td>
+          <td>${escapeHtml(d.comment || "")}</td>
+          <td class="when">${escapeHtml(formatWarsawDateTime(d.decidedAt)) || "—"}</td>
+          ${
+            withSig
+              ? `<td class="sig">${
+                  signatureData[d.id] ? `<img src="${escapeHtml(signatureData[d.id])}" alt="Podpis" />` : ""
+                }</td>`
+              : ""
+          }
+        </tr>`
+          )
+          .join("")
+      : `<tr><td colspan="${withSig ? 6 : 5}" class="muted" style="text-align:center;padding:12px;">Brak akceptujących.</td></tr>`;
+
+  const historyHtml = change.history.length
+    ? `
+    <h2 class="section">Decyzje dla wcześniejszych wersji karty</h2>
+    <div class="muted" style="margin-bottom:6px;">Treść karty została zmieniona przez autora po tych decyzjach — nie dotyczą bieżącej wersji.</div>
+    <table class="decisions">
+      <thead><tr><th>Lp.</th><th>Akceptujący</th><th>Decyzja</th><th>Komentarz</th><th>Data i godzina</th><th class="sig">Podpis</th></tr></thead>
+      <tbody>${decisionRows(change.history, true)}</tbody>
+    </table>`
+    : "";
+
+  return documentShell(
+    `
+    <style>${changeStyles()}</style>
+    <div class="title-bar">
+      <div>
+        <div class="kicker">System raportowania prac &bull; RYCOS Shift</div>
+        <div class="title">Karta zmiany w projekcie</div>
+      </div>
+      <div class="stamp">
+        <strong>${escapeHtml(change.number)}</strong>
+        wersja ${change.version} &bull; ${escapeHtml(formatWarsawDateTime(change.versionSentAt))}
+      </div>
+    </div>
+
+    <div class="meta">
+      <div class="cell">
+        <div class="label">Plac budowy</div>
+        <div class="value">${escapeHtml(change.siteName)}</div>
+      </div>
+      <div class="cell">
+        <div class="label">Zgłaszający</div>
+        <div class="value">${escapeHtml(change.authorName)}</div>
+      </div>
+      <div class="cell">
+        <div class="label">Lokalizacja GPS</div>
+        <div class="value mono">${escapeHtml(gps)}</div>
+      </div>
+    </div>
+
+    <div class="label" style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:0.7px;color:#64748b;">Nazwa</div>
+    <div class="change-name">${escapeHtml(change.name)}</div>
+
+    ${
+      change.knaRequired
+        ? `<div class="kna">KONIECZNE KNA<small>Zaznaczenie oznacza konieczność rewizji całego projektu od początku.</small></div>`
+        : `<div class="kna-no">Konieczne KNA: nie</div>`
+    }
+
+    <h2 class="section">1. Jest</h2>
+    ${
+      change.current.description.trim()
+        ? `<div class="section-desc">${escapeHtml(change.current.description)}</div>`
+        : ""
+    }
+    ${changePhotosHtml(change.current.photos, photoData, "Jest")}
+
+    <h2 class="section">2. Powinno być</h2>
+    ${
+      change.target.description.trim()
+        ? `<div class="section-desc">${escapeHtml(change.target.description)}</div>`
+        : ""
+    }
+    ${changePhotosHtml(change.target.photos, photoData, "Powinno być")}
+
+    <h2 class="section">3. Decyzje akceptujących (wersja ${change.version})</h2>
+    <table class="decisions">
+      <thead><tr><th>Lp.</th><th>Akceptujący</th><th>Decyzja</th><th>Komentarz</th><th>Data i godzina</th><th class="sig">Podpis</th></tr></thead>
+      <tbody>${decisionRows(change.decisions, true)}</tbody>
+    </table>
+    <div class="status-line">Status karty: ${escapeHtml(input.statusLabel)}</div>
+
+    ${historyHtml}
+
+    ${renderClosing()}
+  `,
+    fontCss
+  );
+}

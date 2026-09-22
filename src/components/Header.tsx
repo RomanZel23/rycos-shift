@@ -13,10 +13,12 @@ import {
   HardHat,
   ChevronDown,
   LogOut,
+  ClipboardPen,
 } from "lucide-react";
+import { canInitiateChanges, isAcceptorOnly } from "@/lib/project-change";
 import { User, TenantSettings } from "@/types";
 
-export type ActiveTab = "START_SHIFT" | "END_SHIFT" | "ARCHIVE" | "SETTINGS";
+export type ActiveTab = "START_SHIFT" | "END_SHIFT" | "CHANGES" | "ARCHIVE" | "SETTINGS";
 
 interface HeaderProps {
   activeTab: ActiveTab;
@@ -36,6 +38,9 @@ export function Header({
   reportsCount,
 }: HeaderProps) {
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  // Akceptujący bez uprawnień brygadzisty widzi wyłącznie rejestr zmian.
+  const tylkoZmiany = isAcceptorOnly(currentUser);
+  const pokazZmiany = canInitiateChanges(currentUser) || Boolean(currentUser.canAcceptChanges);
   const [currentTime, setCurrentTime] = useState("");
 
   useEffect(() => {
@@ -77,6 +82,7 @@ export function Header({
 
           {/* NAWIGACJA DESKTOP / TABLET */}
           <nav className="hidden md:flex items-center gap-2 bg-slate-800/90 p-2 rounded-2xl border border-slate-700/80">
+            {!tylkoZmiany && (<>
             <button
               type="button"
               onClick={() => onTabChange("START_SHIFT")}
@@ -102,7 +108,24 @@ export function Header({
               <Camera className="w-4 h-4" />
               <span>Zakończenie prac</span>
             </button>
+            </>)}
 
+            {pokazZmiany && (
+              <button
+                type="button"
+                onClick={() => onTabChange("CHANGES")}
+                className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-sm font-bold transition-all cursor-pointer ${
+                  activeTab === "CHANGES"
+                    ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/30"
+                    : "text-slate-300 hover:text-white hover:bg-slate-700/60"
+                }`}
+              >
+                <ClipboardPen className="w-4 h-4" />
+                <span>Zmiany w projekcie</span>
+              </button>
+            )}
+
+            {!tylkoZmiany && (
             <button
               type="button"
               onClick={() => onTabChange("ARCHIVE")}
@@ -120,6 +143,7 @@ export function Header({
                 </span>
               )}
             </button>
+            )}
 
             {/* ZAKŁADKA USTAWIENIA – TYLKO DLA ADMINA */}
             {currentUser.isAdmin && (
@@ -171,6 +195,8 @@ export function Header({
                     ? "Administrator"
                     : currentUser.isForeman
                     ? "Brygadzista"
+                    : currentUser.canAcceptChanges
+                    ? "Akceptujący"
                     : "Pracownik"}
                 </div>
               </div>
@@ -238,63 +264,82 @@ export function Header({
       </div>
 
       {/* MOBILNA BELKA NAWIGACYJNA (DUŻE IKONY I CZYTELNE NAPISY) */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-900/98 backdrop-blur-lg border-t-2 border-slate-800 px-3 py-2 flex items-center justify-around shadow-2xl">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-900/98 backdrop-blur-lg border-t-2 border-slate-800 px-1 py-2 flex items-center justify-around shadow-2xl">
+        {!tylkoZmiany && (<>
         <button
           type="button"
           onClick={() => onTabChange("START_SHIFT")}
-          className={`flex flex-col items-center gap-1 py-2 px-3 rounded-2xl transition-all cursor-pointer ${
+          className={`flex flex-col items-center gap-1 py-2 px-1.5 rounded-2xl transition-all cursor-pointer ${
             activeTab === "START_SHIFT"
               ? "text-white font-black bg-sky-600 shadow-md shadow-sky-600/30 scale-105"
               : "text-slate-400 font-bold hover:text-slate-200"
           }`}
         >
           <FileText className="w-6 h-6" />
-          <span className="text-xs">Rozpoczęcie</span>
+          <span className="text-[11px] leading-tight">Rozpoczęcie</span>
         </button>
 
         <button
           type="button"
           onClick={() => onTabChange("END_SHIFT")}
-          className={`flex flex-col items-center gap-1 py-2 px-3 rounded-2xl transition-all cursor-pointer ${
+          className={`flex flex-col items-center gap-1 py-2 px-1.5 rounded-2xl transition-all cursor-pointer ${
             activeTab === "END_SHIFT"
               ? "text-white font-black bg-indigo-600 shadow-md shadow-indigo-600/30 scale-105"
               : "text-slate-400 font-bold hover:text-slate-200"
           }`}
         >
           <Camera className="w-6 h-6" />
-          <span className="text-xs">Zakończenie</span>
+          <span className="text-[11px] leading-tight">Zakończenie</span>
         </button>
+        </>)}
 
+        {pokazZmiany && (
+          <button
+            type="button"
+            onClick={() => onTabChange("CHANGES")}
+            className={`flex flex-col items-center gap-1 py-2 px-1.5 rounded-2xl transition-all cursor-pointer ${
+              activeTab === "CHANGES"
+                ? "text-white font-black bg-emerald-600 shadow-md shadow-emerald-600/30 scale-105"
+                : "text-slate-400 font-bold hover:text-slate-200"
+            }`}
+          >
+            <ClipboardPen className="w-6 h-6" />
+            <span className="text-[11px] leading-tight">Zmiany</span>
+          </button>
+        )}
+
+        {!tylkoZmiany && (
         <button
           type="button"
           onClick={() => onTabChange("ARCHIVE")}
-          className={`flex flex-col items-center gap-1 py-2 px-3 rounded-2xl transition-all cursor-pointer relative ${
+          className={`flex flex-col items-center gap-1 py-2 px-1.5 rounded-2xl transition-all cursor-pointer relative ${
             activeTab === "ARCHIVE"
               ? "text-white font-black bg-slate-700 shadow-md scale-105"
               : "text-slate-400 font-bold hover:text-slate-200"
           }`}
         >
           <Archive className="w-6 h-6" />
-          <span className="text-xs">Archiwum</span>
+          <span className="text-[11px] leading-tight">Archiwum</span>
           {reportsCount > 0 && (
             <span className="absolute top-1 right-2 w-5 h-5 bg-sky-500 text-white rounded-full text-xs flex items-center justify-center font-black">
               {reportsCount}
             </span>
           )}
         </button>
+        )}
 
         {currentUser.isAdmin && (
           <button
             type="button"
             onClick={() => onTabChange("SETTINGS")}
-            className={`flex flex-col items-center gap-1 py-2 px-3 rounded-2xl transition-all cursor-pointer ${
+            className={`flex flex-col items-center gap-1 py-2 px-1.5 rounded-2xl transition-all cursor-pointer ${
               activeTab === "SETTINGS"
                 ? "text-white font-black bg-amber-600 shadow-md shadow-amber-600/30 scale-105"
                 : "text-slate-400 font-bold hover:text-slate-200"
             }`}
           >
             <SettingsIcon className="w-6 h-6" />
-            <span className="text-xs">Ustawienia</span>
+            <span className="text-[11px] leading-tight">Ustawienia</span>
           </button>
         )}
 
@@ -303,10 +348,10 @@ export function Header({
           <button
             type="button"
             onClick={onLogout}
-            className="flex flex-col items-center gap-1 py-2 px-3 rounded-2xl text-rose-400 hover:text-rose-300 font-bold transition-all cursor-pointer"
+            className="flex flex-col items-center gap-1 py-2 px-1.5 rounded-2xl text-rose-400 hover:text-rose-300 font-bold transition-all cursor-pointer"
           >
             <LogOut className="w-6 h-6" />
-            <span className="text-xs">Wyjdź</span>
+            <span className="text-[11px] leading-tight">Wyjdź</span>
           </button>
         )}
       </div>

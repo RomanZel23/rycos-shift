@@ -10,6 +10,8 @@ import { AdminSettings } from "@/components/AdminSettings";
 import { LoginForm } from "@/components/LoginForm";
 import { AccessGate } from "@/components/AccessGate";
 import { PwaInstallPrompt } from "@/components/PwaInstallPrompt";
+import { ProjectChangesTab } from "@/components/ProjectChangesTab";
+import { isAcceptorOnly } from "@/lib/project-change";
 import {
   User,
   ConstructionSite,
@@ -40,6 +42,10 @@ import {
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("START_SHIFT");
+  // Archiwum ma dwie sekcje: raporty dzienne i zmiany w projekcie (punkt 11).
+  const [archiveSection, setArchiveSection] = useState<"REPORTS" | "CHANGES">("REPORTS");
+  // Karta do otwarcia po wejściu z linku w mailu (/?zmiana=<id>).
+  const [focusChangeId, setFocusChangeId] = useState<string | null>(null);
 
   // Wszystkie stany pobierane w 100% z bazy danych Supabase (brak wpisów na sztywno)
   const [users, setUsers] = useState<User[]>([]);
@@ -321,10 +327,34 @@ export default function Home() {
     if (currentUser) syncWithDatabase();
   }, [currentUser, syncWithDatabase]);
 
+  // /?zmiana=<id> — z linku w mailu (po PIN-ie) albo z powiadomienia o decyzji.
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get("zmiana");
+      if (id) {
+        setFocusChangeId(id);
+        params.delete("zmiana");
+        const rest = params.toString();
+        window.history.replaceState(null, "", `${window.location.pathname}${rest ? `?${rest}` : ""}`);
+      }
+    } catch {
+      /* brak dostępu do adresu — bez znaczenia */
+    }
+  }, []);
+
+  // Akceptujący bez uprawnień brygadzisty widzi wyłącznie rejestr zmian,
+  // a karta z linku otwiera się w zakładce zmian.
+  useEffect(() => {
+    if (!currentUser) return;
+    if (focusChangeId || isAcceptorOnly(currentUser)) setActiveTab("CHANGES");
+  }, [currentUser, focusChangeId]);
+  const clearFocus = useCallback(() => setFocusChangeId(null), []);
+
   // Handlery logowania i wylogowania. Sesję zakłada i kasuje serwer.
   const handleLogin = (user: User) => {
     setCurrentUser(user);
-    setActiveTab("START_SHIFT");
+    setActiveTab(isAcceptorOnly(user) ? "CHANGES" : "START_SHIFT");
   };
 
   const handleLogout = async () => {
@@ -440,7 +470,18 @@ export default function Home() {
 
       {/* GŁÓWNA ZAWARTOŚĆ STRONY */}
       <main className="flex-1 w-full max-w-6xl mx-auto px-3.5 sm:px-6 pt-4 sm:pt-8 pb-20 md:pb-8">
-        {activeTab === "START_SHIFT" && (
+        {activeTab === "CHANGES" && (
+          <ProjectChangesTab
+            currentUser={currentUser}
+            sites={sites}
+            users={users}
+            reports={reports}
+            focusChangeId={focusChangeId}
+            onFocusHandled={clearFocus}
+          />
+        )}
+
+        {activeTab === "START_SHIFT" && !isAcceptorOnly(currentUser) && (
           <StartShiftForm
             sites={sites}
             users={users}
@@ -451,7 +492,7 @@ export default function Home() {
           />
         )}
 
-        {activeTab === "END_SHIFT" && (
+        {activeTab === "END_SHIFT" && !isAcceptorOnly(currentUser) && (
           <EndShiftForm
             sites={sites}
             users={users}
@@ -461,7 +502,44 @@ export default function Home() {
           />
         )}
 
-        {activeTab === "ARCHIVE" && (
+        {activeTab === "ARCHIVE" && !isAcceptorOnly(currentUser) && (
+          <div className="max-w-5xl mx-auto mb-5 flex gap-2">
+            <button
+              type="button"
+              onClick={() => setArchiveSection("REPORTS")}
+              className={`flex-1 sm:flex-none px-4 py-2.5 rounded-2xl text-sm font-black cursor-pointer ${
+                archiveSection === "REPORTS"
+                  ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
+                  : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-2 border-slate-200 dark:border-slate-800"
+              }`}
+            >
+              Raporty dzienne
+            </button>
+            <button
+              type="button"
+              onClick={() => setArchiveSection("CHANGES")}
+              className={`flex-1 sm:flex-none px-4 py-2.5 rounded-2xl text-sm font-black cursor-pointer ${
+                archiveSection === "CHANGES"
+                  ? "bg-emerald-600 text-white"
+                  : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-2 border-slate-200 dark:border-slate-800"
+              }`}
+            >
+              Zmiany w projekcie
+            </button>
+          </div>
+        )}
+
+        {activeTab === "ARCHIVE" && !isAcceptorOnly(currentUser) && archiveSection === "CHANGES" && (
+          <ProjectChangesTab
+            currentUser={currentUser}
+            sites={sites}
+            users={users}
+            reports={reports}
+            archiveOnly
+          />
+        )}
+
+        {activeTab === "ARCHIVE" && !isAcceptorOnly(currentUser) && archiveSection === "REPORTS" && (
           <ReportArchive
             reports={reports}
             settings={settings}

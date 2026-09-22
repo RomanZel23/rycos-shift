@@ -13,6 +13,8 @@ interface SignatureModalProps {
   preselectedUser?: User | null;
   availableUsers: User[];
   alreadyAddedUserIds: string[];
+  /** Własny tytuł okna (np. podpis decyzji w karcie zmiany). */
+  title?: string;
 }
 
 export function SignatureModal({
@@ -23,6 +25,7 @@ export function SignatureModal({
   preselectedUser,
   availableUsers,
   alreadyAddedUserIds,
+  title,
 }: SignatureModalProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -257,7 +260,7 @@ export function SignatureModal({
             </div>
             <div>
               <h3 className="font-black text-lg sm:text-xl text-white">
-                {isForemanModal ? "Podpis Brygadzisty" : "Podpis pracownika na liście"}
+                {title || (isForemanModal ? "Podpis Brygadzisty" : "Podpis pracownika na liście")}
               </h3>
               <p className="text-xs sm:text-sm text-slate-400 font-semibold">
                 Złóż czytelny podpis palcem lub rysikiem
