@@ -299,6 +299,11 @@ export function ProjectChangeForm({
       if (!isEdit) await discardDraft();
       setSendKey(newPrefixedId("send"));
       onSent(data.change as ProjectChange, problemy);
+    } catch (err) {
+      console.error("Wysyłka karty zmiany:", err);
+      setErrorBanner(
+        `Nieoczekiwany błąd: ${err instanceof Error ? err.message : String(err)}. Karta jest zapisana na urządzeniu.`
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -513,6 +518,18 @@ export function ProjectChangeForm({
           </div>
         )}
       </div>
+
+      {/* Komunikat także tuż nad przyciskiem — górny baner jest poza ekranem,
+          gdy użytkownik naciska „Wyślij" na dole długiego formularza. */}
+      {errorBanner && (
+        <div
+          role="alert"
+          className="p-4 bg-rose-50 dark:bg-rose-950/70 border-2 border-rose-300 dark:border-rose-800 rounded-2xl text-rose-900 dark:text-rose-100 text-sm font-bold flex items-center gap-3"
+        >
+          <AlertTriangle className="w-6 h-6 flex-shrink-0 text-rose-600" />
+          <span>{errorBanner}</span>
+        </div>
+      )}
 
       <button
         type="submit"
