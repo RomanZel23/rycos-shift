@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseClient } from "@/lib/supabase";
 import { requireAdmin, withRefreshedSession } from "@/lib/auth";
 import { hashSecret, validatePassword, validatePin } from "@/lib/password";
+import {
+  SESSION_COOKIE,
+  SESSION_TTL_SECONDS,
+  createSessionToken,
+  sessionCookieOptions,
+} from "@/lib/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -90,10 +96,8 @@ export async function POST(req: NextRequest) {
   }
 
   // Odbieranie sobie samemu ostatniego hasła zamknęłoby dostęp do panelu.
-  if (
-    userId === auth.context.user.id &&
-    (update.password_hash === null || body.clearPassword)
-  ) {
+  const isSelf = userId === auth.context.user.id;
+  if (isSelf && update.password_hash === null) {
     return NextResponse.json(
       {
         success: false,
@@ -103,13 +107,31 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const newEpoch = Number(target.session_epoch ?? 1) + 1;
   update.failed_login_attempts = 0;
   update.locked_until = null;
-  update.session_epoch = Number(target.session_epoch ?? 1) + 1;
+  update.session_epoch = newEpoch;
 
   const { error } = await supabase.from("users").update(update).eq("id", userId);
   if (error) {
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });
+  }
+
+  if (isSelf) {
+    // Podniesienie epoki unieważnia wszystkie ciasteczka — łącznie z tym,
+    // którym administrator właśnie się posłużył. Bez nowego ciasteczka zmiana
+    // własnego hasła lub PIN-u wylogowywała go w pół kroku. Na tym urządzeniu
+    // wystawiamy sesję z nową epoką; pozostałe urządzenia tracą ważność.
+    const res = NextResponse.json({
+      success: true,
+      message: "Poświadczenia zaktualizowane. Sesje na innych urządzeniach wygasły.",
+    });
+    res.cookies.set({
+      name: SESSION_COOKIE,
+      value: createSessionToken(userId, newEpoch),
+      ...sessionCookieOptions(SESSION_TTL_SECONDS),
+    });
+    return res;
   }
 
   return withRefreshedSession(

@@ -200,9 +200,19 @@ export function ReportArchive({
    * danych i archiwizuje go — od następnego razu droga jest już zwykła.
    * Wcześniej kończyło się to komunikatem „brak pliku PDF" bez wyjścia.
    */
+  /**
+   * Raport z kolejki offline (bez cloudSyncedAt) nie istnieje jeszcze w bazie,
+   * więc /api/reports/resend i /api/reports/pdf odpowiadały „Nie znaleziono
+   * raportu w archiwum". Najpierw go dosyłamy — synchronizacja robi to sama.
+   */
+  const ensureUploaded = async (report: DailyReport) => {
+    if (!report.cloudSyncedAt && onRefresh) await onRefresh();
+  };
+
   const handleDownload = async (report: DailyReport) => {
     try {
       let blob: Blob;
+      await ensureUploaded(report);
 
       if (report.pdfDataUrl) {
         const res = await fetch(report.pdfDataUrl);
@@ -263,6 +273,7 @@ export function ReportArchive({
     try {
       setResendingId(report.id);
       setResendStatus(null);
+      await ensureUploaded(report);
 
       // Etap 2: wysyłamy wyłącznie identyfikator. Serwer bierze zarchiwizowany
       // plik PDF z bucketu i aktualną listę odbiorców z bazy — klient nie ma

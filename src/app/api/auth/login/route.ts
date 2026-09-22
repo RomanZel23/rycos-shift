@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { clientIpFromHeaders } from "@/lib/client-ip";
 import { getSupabaseClient, isSupabaseConfigured } from "@/lib/supabase";
 import { burnVerificationTime, verifySecret } from "@/lib/password";
 import {
@@ -22,9 +23,7 @@ const IP_WINDOW_MS = 15 * 60 * 1000;
 const ipAttempts = new Map<string, { count: number; resetAt: number }>();
 
 function clientKey(req: NextRequest): string {
-  const fwd = req.headers.get("x-forwarded-for");
-  if (fwd) return fwd.split(",")[0].trim();
-  return req.headers.get("x-real-ip") || "unknown";
+  return clientIpFromHeaders(req.headers);
 }
 
 function ipBlocked(key: string): boolean {
@@ -40,6 +39,16 @@ function registerIpFailure(key: string): void {
     return;
   }
   entry.count += 1;
+}
+
+/**
+ * ilike traktuje % i _ jako symbole wieloznaczne. Bez ucieczki login
+ * „jan_kowalski" pasował też do „janXkowalski" (dwa wiersze -> błąd
+ * maybeSingle -> prawowity użytkownik nie mógł się zalogować), a „%"
+ * trafiał w dowolne konto bez znajomości jego loginu.
+ */
+function escapeLikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, (ch) => `\\${ch}`);
 }
 
 /** Ta sama treść dla złego loginu i złego hasła — nie podpowiadamy, co było nie tak. */
@@ -99,6 +108,10 @@ export async function POST(req: NextRequest) {
     return invalidCredentials();
   }
 
+  // PostgREST zamienia „*" we wzorcu ilike na „%" i tego nie da się
+  // wyescapować — login z gwiazdką nie jest prawdziwym loginem.
+  if (mode === "password" && login.includes("*")) login = "";
+
   if (!secret || (mode === "pin" ? !userId : !login)) {
     registerIpFailure(ipKey);
     await burnVerificationTime();
@@ -116,7 +129,7 @@ export async function POST(req: NextRequest) {
 
   const { data: row } = await (mode === "pin"
     ? query.eq("id", userId).maybeSingle()
-    : query.ilike("login", login).maybeSingle());
+    : query.ilike("login", escapeLikePattern(login)).maybeSingle());
 
   if (!row) {
     registerIpFailure(ipKey);

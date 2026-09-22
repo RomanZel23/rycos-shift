@@ -62,29 +62,62 @@ export function SignatureModal({
     }
   }, []);
 
+  // Najświeższa lista do wyboru, czytana w efekcie otwarcia bez robienia z niej
+  // zależności. Rodzic przekazuje `alreadyAddedUserIds` jako nową tablicę przy
+  // każdym renderze (np. gdy GPS dośle pozycję albo odtworzy się szkic), więc
+  // efekt zależny od niej czyścił płótno i przestawiał wybranego pracownika
+  // W TRAKCIE składania podpisu.
+  const selectableRef = useRef(selectableWorkers);
   useEffect(() => {
-    if (isOpen) {
-      setHasSignature(false);
-      setErrorMsg(null);
-      pointsCountRef.current = 0;
+    selectableRef.current = selectableWorkers;
+  });
 
-      if (isForemanModal && preselectedUser) {
-        setSelectedUserId(preselectedUser.id);
-      } else if (selectableWorkers.length > 0) {
-        setSelectedUserId(selectableWorkers[0].id);
-      } else {
-        setSelectedUserId("");
-      }
+  // Reset wyłącznie przy otwarciu okna (przejście isOpen false -> true).
+  useEffect(() => {
+    if (!isOpen) return;
+    setHasSignature(false);
+    setErrorMsg(null);
+    pointsCountRef.current = 0;
 
-      setTimeout(() => {
-        initCanvas();
-      }, 50);
+    const lista = selectableRef.current;
+    if (isForemanModal && preselectedUser) {
+      setSelectedUserId(preselectedUser.id);
+    } else if (lista.length > 0) {
+      setSelectedUserId(lista[0].id);
+    } else {
+      setSelectedUserId("");
     }
-  }, [isOpen, isForemanModal, preselectedUser, availableUsers, alreadyAddedUserIds, initCanvas]);
+
+    const t = setTimeout(() => {
+      initCanvas();
+    }, 50);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   useEffect(() => {
     const handleResize = () => {
-      if (isOpen) initCanvas();
+      if (!isOpen) return;
+      const canvas = canvasRef.current;
+      const container = containerRef.current;
+      if (!canvas || !container) return;
+      const rect = container.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      // Pasek adresu Safari chowa się i wysuwa, zgłaszając „resize" bez zmiany
+      // wymiarów płótna. Takie zdarzenie ignorujemy — inaczej rysunek znikał.
+      if (
+        Math.floor(rect.width * dpr) === canvas.width &&
+        Math.floor(rect.height * dpr) === canvas.height
+      ) {
+        return;
+      }
+      // Prawdziwa zmiana rozmiaru (obrót ekranu) czyści płótno, więc stan
+      // „jest podpis" też musi zniknąć. Wcześniej zostawał i dało się
+      // zatwierdzić PUSTY podpis.
+      initCanvas();
+      pointsCountRef.current = 0;
+      setHasSignature(false);
+      setErrorMsg("Zmienił się rozmiar ekranu — złóż podpis ponownie.");
     };
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);

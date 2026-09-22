@@ -127,8 +127,14 @@ export const getStoredReports = (): DailyReport[] => {
   }
 };
 
-export const saveStoredReport = (report: DailyReport): void => {
-  if (typeof window === "undefined") return;
+/**
+ * Zapis jednego raportu w lokalnej kopii. Zwraca false, gdy się nie udało —
+ * najczęściej przez limit localStorage (~5 MB), który raport z kilkunastoma
+ * zdjęciami w base64 przekracza sam. Wołający MUSI to sprawdzić, zanim powie
+ * użytkownikowi, że raport „został zachowany na urządzeniu".
+ */
+export const saveStoredReport = (report: DailyReport): boolean => {
+  if (typeof window === "undefined") return false;
   try {
     const existing = getStoredReports();
     // Sprawdź czy raport już istnieje (np. aktualizacja)
@@ -139,8 +145,10 @@ export const saveStoredReport = (report: DailyReport): void => {
       existing.unshift(report);
     }
     localStorage.setItem(STORAGE_KEYS.REPORTS, JSON.stringify(existing));
+    return true;
   } catch (err) {
     console.warn("Storage save report error:", err);
+    return false;
   }
 };
 

@@ -9,7 +9,13 @@ import { loadExoFontFaceCss, loadLogoDataUrl, mediaAsDataUrls } from "@/lib/pdf-
 import { resolveEmailConfig, sendReportEmail } from "@/lib/email";
 import { sanitizePdfFileName, slugifyForFileName } from "@/lib/pdf-generator";
 import { DailyReport } from "@/types";
-import { REPORTS_TABLE, dailyReportToRow } from "@/lib/report-mapper";
+import {
+  REPORTS_TABLE,
+  REPORT_COLUMNS,
+  dailyReportToRow,
+  rowToDailyReport,
+} from "@/lib/report-mapper";
+import type { ReportRow } from "@/lib/report-mapper";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -71,14 +77,43 @@ export async function POST(req: NextRequest) {
   const authorId = auth.context.user.id;
   const authorName = `${auth.context.user.firstName} ${auth.context.user.lastName}`.trim();
 
+  // Idempotencja. Telefon przy słabym zasięgu potrafi nie doczekać odpowiedzi,
+  // choć serwer raport zapisał i wysłał. Ponowne złożenie tego samego raportu
+  // (formularz trzyma ten sam identyfikator między próbami) nie może wysłać
+  // drugiego maila ani nadpisać wiersza — oddajemy to, co już jest w bazie.
+  // Raport zapisany wcześniej bez wysyłki (FAILED / EMAIL_FAILED) przechodzi
+  // dalej i zostaje uzupełniony o PDF i mail.
+  const { data: existing } = await supabase
+    .from(REPORTS_TABLE)
+    .select(REPORT_COLUMNS)
+    .eq("id", report.id)
+    .maybeSingle();
+
+  if (existing && (existing as unknown as ReportRow).status === "SENT") {
+    const already = rowToDailyReport(existing as unknown as ReportRow);
+    return withRefreshedSession(
+      NextResponse.json({
+        success: true,
+        emailSent: true,
+        emailCode: "SENT",
+        alreadySaved: true,
+        message: "Ten raport był już zapisany i wysłany — nie wysyłam go drugi raz.",
+        report: already,
+      }),
+      auth.context
+    );
+  }
+
   const dateStr = (report.date || "").replace(/[^0-9-]/g, "");
   const siteSlug = slugifyForFileName(report.siteName, "plac");
 
   // 1. Podpisy i zdjęcia do prywatnego bucketu (przychodzą jako base64)
   const optimized = await optimizeReportForStorage({ ...report, pdfDataUrl: undefined });
-  optimized.pdfFileName =
-    report.pdfFileName ||
-    sanitizePdfFileName(
+  // Nazwa z urządzenia też przechodzi przez sanityzator — trafia do nagłówka
+  // Content-Disposition i do nazwy załącznika.
+  optimized.pdfFileName = report.pdfFileName
+    ? sanitizePdfFileName(report.pdfFileName)
+    : sanitizePdfFileName(
       `${report.date}_${
         report.reportType === "START_SHIFT"
           ? "Rozpoczecie_prac_zespolu"
@@ -141,7 +176,36 @@ export async function POST(req: NextRequest) {
 
   optimized.pdfDataUrl = toAppFileUrl(pdfPath);
 
-  // 3. Wysyłka — konfiguracja wyłącznie z serwera
+  const rowExtras = {
+    pdfPath,
+    createdBy: authorId,
+    createdByName: authorName,
+  };
+
+  // 3. Zapis wiersza PRZED wysyłką maila. Wcześniej kolejność była odwrotna:
+  // gdy mail poszedł, a zapis w bazie padł, telefon dostawał błąd, trzymał
+  // raport jako niedosłany, a potem ktoś wysyłał go drugi raz z Archiwum.
+  // Status do czasu potwierdzenia z Resend to EMAIL_FAILED — jeśli proces
+  // padnie w trakcie, archiwum pokaże prawdę: mail niepotwierdzony.
+  const { error: dbError } = await supabase.from(REPORTS_TABLE).upsert(
+    dailyReportToRow(optimized, {
+      ...rowExtras,
+      status: "EMAIL_FAILED",
+      sentToEmails: [],
+      emailSentAt: null,
+      errorMessage: "Wysyłka e-mail w toku albo niepotwierdzona.",
+    }),
+    { onConflict: "id" }
+  );
+
+  if (dbError) {
+    return NextResponse.json(
+      { success: false, message: `Nie udało się zapisać raportu: ${dbError.message}` },
+      { status: 500 }
+    );
+  }
+
+  // 4. Wysyłka — konfiguracja wyłącznie z serwera
   const config = await resolveEmailConfig(supabase, report.reportType);
   const outcome = await sendReportEmail(
     config,
@@ -161,25 +225,24 @@ export async function POST(req: NextRequest) {
   // żeby „brak daty" jednoznacznie znaczyło „mail nie poszedł".
   const emailSentAt = outcome.ok ? new Date().toISOString() : null;
 
-  // 4. Zapis wiersza. Kształt buduje mapper — w bazie lądują wyłącznie
-  // ścieżki w buckecie, czego pilnuje też CHECK na kolumnie pdf_path.
-  const { error: dbError } = await supabase.from(REPORTS_TABLE).upsert(
-    dailyReportToRow(optimized, {
-      pdfPath,
+  // 5. Aktualizacja statusu po odpowiedzi Resend. Mail już poszedł (albo nie),
+  // więc nieudana aktualizacja nie może zamienić sukcesu w błąd — wiersz
+  // zostaje wtedy z EMAIL_FAILED i da się go sprawdzić w logach.
+  const { error: statusError } = await supabase
+    .from(REPORTS_TABLE)
+    .update({
       status,
-      sentToEmails: outcome.ok ? outcome.recipients : [],
-      emailSentAt,
-      errorMessage: outcome.ok ? null : outcome.message,
-      createdBy: authorId,
-      createdByName: authorName,
-    }),
-    { onConflict: "id" }
-  );
+      sent_to_emails: outcome.ok ? outcome.recipients : [],
+      email_sent_at: emailSentAt,
+      error_message: outcome.ok ? null : outcome.message,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", report.id);
 
-  if (dbError) {
-    return NextResponse.json(
-      { success: false, message: `Nie udało się zapisać raportu: ${dbError.message}` },
-      { status: 500 }
+  if (statusError) {
+    console.error(
+      `Raport ${report.id}: nie udało się zapisać statusu wysyłki (${status}):`,
+      statusError.message
     );
   }
 

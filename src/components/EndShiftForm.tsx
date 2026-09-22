@@ -89,9 +89,12 @@ export function EndShiftForm({
   // których nie da się odtworzyć z pamięci — wyjście z ekranu kasowało je bez
   // ostrzeżenia. Szkic ląduje w IndexedDB, nie w localStorage, bo kilka zdjęć
   // w base64 przekracza limit tego drugiego.
+  // Identyfikator raportu stały między próbami wysyłki — patrz StartShiftForm.
+  const [reportId, setReportId] = useState("");
+
   const draftPayload = useMemo<EndShiftDraft>(
-    () => ({ date, time, siteId, foremanId, location, photos }),
-    [date, time, siteId, foremanId, location, photos]
+    () => ({ reportId, date, time, siteId, foremanId, location, photos }),
+    [reportId, date, time, siteId, foremanId, location, photos]
   );
 
   const { restoredAt, discard: discardDraft } = useFormDraft<EndShiftDraft>(
@@ -100,6 +103,7 @@ export function EndShiftForm({
     {
       enabled: !successReport,
       onRestore: (draft) => {
+        if (draft.reportId) setReportId(draft.reportId);
         if (draft.siteId) setSiteId(draft.siteId);
         if (draft.foremanId) setForemanId(draft.foremanId);
         if (draft.date) setDate(draft.date);
@@ -110,10 +114,14 @@ export function EndShiftForm({
     }
   );
 
+  // Data i godzina otwarcia — raz. Patrz uwaga w StartShiftForm: zależność od
+  // list placów i pracowników przestawiała godzinę i nadpisywała datę szkicu.
   useEffect(() => {
     setDate(getPolishCurrentDate());
     setTime(getPolishCurrentTime());
+  }, []);
 
+  useEffect(() => {
     if (sites.length > 0 && !siteId) {
       setSiteId(sites[0].id);
     }
@@ -260,8 +268,11 @@ export function EndShiftForm({
         ? `${selectedForeman.firstName} ${selectedForeman.lastName}`
         : "Brygadzista";
 
+      const id = reportId || newPrefixedId("rep-end");
+      if (!reportId) setReportId(id);
+
       let reportData: DailyReport = {
-        id: newPrefixedId("rep-end"),
+        id,
         tenantId: settings.tenantId,
         reportType: "END_SHIFT",
         date,
@@ -280,14 +291,20 @@ export function EndShiftForm({
 
       // Etap 3: dokument PDF generuje Chromium na serwerze. Telefon wysyła
       // wyłącznie dane raportu — nie renderuje już nic i nie dźwiga base64.
-      const response = await fetch("/api/reports", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ report: reportData }),
-      });
-      const resData = await response.json().catch(() => null);
+      let response: Response | null = null;
+      try {
+        response = await fetch("/api/reports", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ report: reportData }),
+        });
+      } catch {
+        // Brak sieci / zerwane połączenie — ta sama ścieżka co odmowa serwera.
+        response = null;
+      }
+      const resData = response ? await response.json().catch(() => null) : null;
 
-      if (!response.ok || !resData?.success) {
+      if (!response || !response.ok || !resData?.success) {
         // Zapis się nie udał — trzymamy raport lokalnie, żeby nie przepadł,
         // i mówimy o tym wprost zamiast pokazywać ekran sukcesu.
         const failed: DailyReport = {
@@ -296,13 +313,24 @@ export function EndShiftForm({
           // Nic nie poszło mailem — lista odbiorców z ustawień byłaby tu
           // nieprawdą i w archiwum wyglądałoby to na wysłany raport.
           sentToEmails: [],
-          errorMessage: resData?.message || "Nie udało się zapisać raportu na serwerze.",
+          errorMessage:
+            resData?.message ||
+            (response ? "Nie udało się zapisać raportu na serwerze." : "Brak połączenia z serwerem."),
         };
-        saveStoredReport(failed);
-        if (onReportCreated) onReportCreated(failed);
-        setErrorBanner(
-          `${failed.errorMessage} Raport został zachowany na tym urządzeniu i zostanie dosłany przy następnej synchronizacji.`
-        );
+        // Kilkanaście zdjęć w base64 potrafi przekroczyć limit localStorage.
+        // Wtedy zapis się nie udaje i NIE wolno mówić, że raport „został
+        // zachowany" — zdjęcia są wyłącznie w szkicu (IndexedDB).
+        const zachowany = saveStoredReport(failed);
+        if (zachowany) {
+          if (onReportCreated) onReportCreated(failed);
+          setErrorBanner(
+            `${failed.errorMessage} Raport został zachowany na tym urządzeniu i zostanie dosłany przy następnej synchronizacji. Możesz też nacisnąć „Wyślij" ponownie — nie powstanie duplikat.`
+          );
+        } else {
+          setErrorBanner(
+            `${failed.errorMessage} Pamięć urządzenia jest pełna — raportu NIE udało się odłożyć do kolejki. Nie zamykaj formularza: zdjęcia są w szkicu. Spróbuj wysłać ponownie, gdy wróci zasięg.`
+          );
+        }
         return;
       }
 
@@ -315,6 +343,7 @@ export function EndShiftForm({
       saveStoredReport(saved);
       if (onReportCreated) onReportCreated(saved);
       discardDraft();
+      setReportId("");
       setEmailWarning(resData.emailSent ? null : resData.message || null);
       reportData = saved;
 
@@ -328,6 +357,7 @@ export function EndShiftForm({
   };
 
   const resetForm = () => {
+    setReportId("");
     setSuccessReport(null);
     setEmailWarning(null);
     setPhotos([]);

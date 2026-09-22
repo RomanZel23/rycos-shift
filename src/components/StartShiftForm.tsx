@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import {
   Calendar,
   Clock,
@@ -86,9 +86,15 @@ export function StartShiftForm({
   // Etap 4: automatyczny szkic w IndexedDB. Podpisy odręczne są tu tym, czym
   // zdjęcia w fotorelacji — nie da się ich odtworzyć bez ponownego zbierania
   // ludzi, więc wyjście z ekranu nie może ich kasować.
+  // Identyfikator raportu nadawany przy pierwszej próbie wysyłki i trzymany
+  // (także w szkicu) aż do sukcesu. Każda ponowna próba tego samego formularza
+  // idzie z tym samym id, więc serwer rozpoznaje duplikat, a lokalna kopia
+  // „niedosłanego" raportu nie staje się drugim raportem w archiwum.
+  const [reportId, setReportId] = useState("");
+
   const draftPayload = useMemo<StartShiftDraft>(
-    () => ({ date, time, siteId, foremanId, location, discussedTopics, attendanceList }),
-    [date, time, siteId, foremanId, location, discussedTopics, attendanceList]
+    () => ({ reportId, date, time, siteId, foremanId, location, discussedTopics, attendanceList }),
+    [reportId, date, time, siteId, foremanId, location, discussedTopics, attendanceList]
   );
 
   const { restoredAt, discard: discardDraft } = useFormDraft<StartShiftDraft>(
@@ -97,6 +103,7 @@ export function StartShiftForm({
     {
       enabled: !successReport,
       onRestore: (draft) => {
+        if (draft.reportId) setReportId(draft.reportId);
         if (draft.siteId) setSiteId(draft.siteId);
         if (draft.foremanId) setForemanId(draft.foremanId);
         if (draft.date) setDate(draft.date);
@@ -108,11 +115,21 @@ export function StartShiftForm({
     }
   );
 
-  // Inicjalizacja daty, godziny, domyślnego placu i brygadzisty
+  // Data i godzina otwarcia formularza — ustawiane RAZ. Wcześniej ten sam
+  // efekt zależał od list placów, pracowników i liczby tematów, więc godzina
+  // przeskakiwała przy każdej synchronizacji czy zmianie tematu, a odtworzony
+  // szkic dostawał dzisiejszą datę zamiast dnia, w którym zebrano podpisy.
   useEffect(() => {
     setDate(getPolishCurrentDate());
     setTime(getPolishCurrentTime());
+  }, []);
 
+  // Domyślny temat podstawiamy tylko raz. Wcześniej usunięcie ostatniego
+  // tematu natychmiast przywracało pierwszy szablon.
+  const defaultTopicApplied = useRef(false);
+
+  // Domyślny plac i brygadzista
+  useEffect(() => {
     if (sites.length > 0 && !siteId) {
       setSiteId(sites[0].id);
     }
@@ -122,8 +139,9 @@ export function StartShiftForm({
       setForemanId(foremen[0].id);
     }
 
-    if (topicTemplates && topicTemplates.length > 0 && discussedTopics.length === 0) {
-      setDiscussedTopics([topicTemplates[0].title]);
+    if (!defaultTopicApplied.current && topicTemplates && topicTemplates.length > 0) {
+      defaultTopicApplied.current = true;
+      if (discussedTopics.length === 0) setDiscussedTopics([topicTemplates[0].title]);
     }
   }, [sites, users, topicTemplates, siteId, foremanId, discussedTopics.length]);
 
@@ -131,8 +149,10 @@ export function StartShiftForm({
   const selectedForeman = users.find((u) => u.id === foremanId);
   const selectedSite = sites.find((s) => s.id === siteId);
 
-  // Sprawdź czy brygadzista podpisał już listę
-  const foremanSigned = attendanceList.some((a) => a.isForeman || a.userId === foremanId);
+  // Czy podpisał brygadzista WYBRANY jako prowadzący odprawę. Wcześniej
+  // wystarczał podpis kogokolwiek z flagą brygadzisty — np. drugiego
+  // brygadzisty podpisanego jako zwykły pracownik albo poprzednio wybranego.
+  const foremanSigned = attendanceList.some((a) => a.userId === foremanId);
 
   const handleAddTopic = (newTopic: string) => {
     setDiscussedTopics((prev) => [...prev, newTopic]);
@@ -192,8 +212,11 @@ export function StartShiftForm({
         ? `${selectedForeman.firstName} ${selectedForeman.lastName}`
         : "Brygadzista";
 
+      const id = reportId || newPrefixedId("rep-start");
+      if (!reportId) setReportId(id);
+
       let reportData: DailyReport = {
-        id: newPrefixedId("rep-start"),
+        id,
         tenantId: settings.tenantId,
         reportType: "START_SHIFT",
         date,
@@ -213,14 +236,22 @@ export function StartShiftForm({
 
       // Etap 3: dokument PDF generuje Chromium na serwerze. Telefon wysyła
       // wyłącznie dane raportu — nie renderuje już nic i nie dźwiga base64.
-      const response = await fetch("/api/reports", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ report: reportData }),
-      });
-      const resData = await response.json().catch(() => null);
+      let response: Response | null = null;
+      try {
+        response = await fetch("/api/reports", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ report: reportData }),
+        });
+      } catch {
+        // Brak sieci / zerwane połączenie — ta sama ścieżka co odmowa serwera.
+        // Wcześniej kończyło się surowym „Failed to fetch" i raport nie trafiał
+        // do kolejki offline.
+        response = null;
+      }
+      const resData = response ? await response.json().catch(() => null) : null;
 
-      if (!response.ok || !resData?.success) {
+      if (!response || !response.ok || !resData?.success) {
         // Zapis się nie udał — trzymamy raport lokalnie, żeby nie przepadł,
         // i mówimy o tym wprost zamiast pokazywać ekran sukcesu.
         const failed: DailyReport = {
@@ -229,13 +260,21 @@ export function StartShiftForm({
           // Nic nie poszło mailem — lista odbiorców z ustawień byłaby tu
           // nieprawdą i w archiwum wyglądałoby to na wysłany raport.
           sentToEmails: [],
-          errorMessage: resData?.message || "Nie udało się zapisać raportu na serwerze.",
+          errorMessage:
+            resData?.message ||
+            (response ? "Nie udało się zapisać raportu na serwerze." : "Brak połączenia z serwerem."),
         };
-        saveStoredReport(failed);
-        if (onReportCreated) onReportCreated(failed);
-        setErrorBanner(
-          `${failed.errorMessage} Raport został zachowany na tym urządzeniu i zostanie dosłany przy następnej synchronizacji.`
-        );
+        const zachowany = saveStoredReport(failed);
+        if (zachowany) {
+          if (onReportCreated) onReportCreated(failed);
+          setErrorBanner(
+            `${failed.errorMessage} Raport został zachowany na tym urządzeniu i zostanie dosłany przy następnej synchronizacji. Możesz też nacisnąć „Wyślij" ponownie — nie powstanie duplikat.`
+          );
+        } else {
+          setErrorBanner(
+            `${failed.errorMessage} Pamięć urządzenia jest pełna — raportu NIE udało się odłożyć do kolejki. Nie zamykaj formularza: podpisy są w szkicu. Spróbuj wysłać ponownie, gdy wróci zasięg.`
+          );
+        }
         return;
       }
 
@@ -248,6 +287,7 @@ export function StartShiftForm({
       saveStoredReport(saved);
       if (onReportCreated) onReportCreated(saved);
       discardDraft();
+      setReportId("");
       setEmailWarning(resData.emailSent ? null : resData.message || null);
       reportData = saved;
 
@@ -261,6 +301,7 @@ export function StartShiftForm({
   };
 
   const resetForm = () => {
+    setReportId("");
     setSuccessReport(null);
     setEmailWarning(null);
     setAttendanceList([]);

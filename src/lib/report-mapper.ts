@@ -157,6 +157,27 @@ export interface RowBuildExtras {
   createdByName?: string;
 }
 
+/** Tolerancja na rozjechany zegar telefonu przy odrzucaniu dat „z przyszłości". */
+const CLOCK_SKEW_MS = 10 * 60 * 1000;
+
+/**
+ * sent_at to chwila złożenia raportu w terenie (patrz typ DailyReport).
+ *
+ * Wcześniej kolumnę wypełniał zawsze zegar serwera, więc raport dosłany
+ * z kolejki offline wieczorem dostawał godzinę dosłania, a nie godzinę odprawy.
+ * Bierzemy znacznik z urządzenia, o ile jest poprawną datą i nie leży
+ * w przyszłości — w przeciwnym razie zostaje zegar serwera.
+ */
+export function fieldSubmittedAt(value: string | undefined | null, now = Date.now()): string {
+  if (typeof value === "string" && value.length > 0) {
+    const ts = Date.parse(value);
+    if (Number.isFinite(ts) && ts <= now + CLOCK_SKEW_MS) {
+      return new Date(ts).toISOString();
+    }
+  }
+  return new Date(now).toISOString();
+}
+
 /**
  * DailyReport (po wgraniu mediów do bucketu) -> wiersz tabeli reports.
  *
@@ -211,7 +232,7 @@ export function dailyReportToRow(report: DailyReport, extras: RowBuildExtras) {
     pdf_file_name: report.pdfFileName,
     pdf_path: extras.pdfPath || null,
     sent_to_emails: extras.sentToEmails,
-    sent_at: new Date().toISOString(),
+    sent_at: fieldSubmittedAt(report.sentAt),
     ...(extras.emailSentAt !== undefined ? { email_sent_at: extras.emailSentAt } : {}),
     status: extras.status,
     error_message: extras.errorMessage ?? null,

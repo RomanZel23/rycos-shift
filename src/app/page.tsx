@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { Header, ActiveTab } from "@/components/Header";
 import { StartShiftForm } from "@/components/StartShiftForm";
@@ -62,8 +62,21 @@ export default function Home() {
   const [isGateChecked, setIsGateChecked] = useState(false);
   const [isGateLocked, setIsGateLocked] = useState(false);
 
+  // Jedna synchronizacja naraz. Start aplikacji, wejście do Archiwum i przycisk
+  // „Odśwież" potrafiły uruchomić ją równolegle — każda wysyłała wtedy te same
+  // niedosłane raporty i zapisywała do localStorage własną wersję listy.
+  const syncInFlight = useRef<Promise<void> | null>(null);
+
   // Funkcja pobierania najświeższych danych bezpośrednio z bazy danych Supabase
-  const syncWithDatabase = useCallback(async () => {
+  const syncWithDatabase = useCallback((): Promise<void> => {
+    if (syncInFlight.current) return syncInFlight.current;
+    const run = runSync().finally(() => {
+      syncInFlight.current = null;
+    });
+    syncInFlight.current = run;
+    return run;
+
+    async function runSync(): Promise<void> {
     try {
       setIsSyncing(true);
       const res = await fetch("/api/db/sync");
@@ -183,6 +196,7 @@ export default function Home() {
       setIsSupabaseConnected(false);
     } finally {
       setIsSyncing(false);
+    }
     }
   }, []);
 
@@ -323,44 +337,55 @@ export default function Home() {
     setActiveTab("START_SHIFT");
   };
 
+  /**
+   * Zapis konfiguracji z panelu administratora. Wcześniej wynik był ignorowany
+   * (`.catch(() => {})`), więc przy odrzuconym zapisie — np. zdublowany login —
+   * panel pokazywał „zapisano", a po następnej synchronizacji zmiana znikała.
+   * Teraz błąd jest pokazywany, a stan wraca do tego, co faktycznie jest w bazie.
+   */
+  const pushAdminSync = useCallback(
+    async (payload: Record<string, unknown>) => {
+      try {
+        const res = await fetch("/api/db/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data?.success) {
+          window.alert(data?.message || "Nie udało się zapisać zmian w bazie.");
+          await syncWithDatabase();
+        }
+      } catch {
+        window.alert("Brak połączenia z serwerem — zmiany nie zostały zapisane w bazie.");
+        await syncWithDatabase();
+      }
+    },
+    [syncWithDatabase]
+  );
+
   const handleUpdateUsers = (updated: User[]) => {
     setUsers(updated);
     saveStoredUsers(updated);
-    fetch("/api/db/sync", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "SYNC_USERS", users: updated }),
-    }).catch(() => {});
+    void pushAdminSync({ action: "SYNC_USERS", users: updated });
   };
 
   const handleUpdateSites = (updated: ConstructionSite[]) => {
     setSites(updated);
     saveStoredSites(updated);
-    fetch("/api/db/sync", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "SYNC_SITES", sites: updated }),
-    }).catch(() => {});
+    void pushAdminSync({ action: "SYNC_SITES", sites: updated });
   };
 
   const handleUpdateTopics = (updated: DiscussedTopicTemplate[]) => {
     setTopics(updated);
     saveStoredTopics(updated);
-    fetch("/api/db/sync", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "SYNC_TOPICS", topics: updated }),
-    }).catch(() => {});
+    void pushAdminSync({ action: "SYNC_TOPICS", topics: updated });
   };
 
   const handleUpdateSettings = (updated: TenantSettings) => {
     setSettings(updated);
     saveStoredSettings(updated);
-    fetch("/api/db/sync", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "SYNC_SETTINGS", settings: updated }),
-    }).catch(() => {});
+    void pushAdminSync({ action: "SYNC_SETTINGS", settings: updated });
   };
 
 

@@ -34,6 +34,20 @@ const ADMIN_ONLY_ACTIONS = new Set([
   "SYNC_PDF_TEMPLATES",
 ]);
 
+/**
+ * Błąd zapisu konfiguracji. Wcześniej wynik zapytań był ignorowany i klient
+ * dostawał success:true — np. duplikat loginu łamał unikalny indeks, konto
+ * nie powstawało, a panel ogłaszał „Użytkownik dodany".
+ */
+function syncError(what: string, error: { message: string; code?: string }) {
+  console.error(`Supabase sync error (${what}):`, error);
+  const message =
+    error.code === "23505"
+      ? `Nie zapisano ${what}: taki login lub identyfikator już istnieje.`
+      : `Nie zapisano ${what}: ${error.message}`;
+  return NextResponse.json({ success: false, message }, { status: 500 });
+}
+
 export async function GET(req: NextRequest) {
   const auth = await requireUser(req);
   if ("response" in auth) return auth.response;
@@ -182,6 +196,32 @@ export async function POST(req: NextRequest) {
     // przy składaniu — dlatego status zostaje FAILED, a mail wysyła się ręcznie
     // z Archiwum po odzyskaniu łączności.
     if (action === "SAVE_REPORT" && report) {
+      if (typeof report.id !== "string" || !report.id) {
+        return NextResponse.json(
+          { success: false, message: "Raport bez identyfikatora." },
+          { status: 400 }
+        );
+      }
+
+      // Kolejka offline NIGDY nie nadpisuje raportu, który już jest w bazie.
+      // Typowy przypadek: /api/reports zapisał i wysłał raport, ale telefon nie
+      // doczekał odpowiedzi i odłożył go do kolejki. Upsert zamieniłby wtedy
+      // wysłany protokół na FAILED i wyczyścił mu ścieżkę PDF.
+      const { data: existing } = await supabase
+        .from(REPORTS_TABLE)
+        .select(REPORT_COLUMNS)
+        .eq("id", report.id)
+        .maybeSingle();
+
+      if (existing) {
+        return NextResponse.json({
+          success: true,
+          alreadySaved: true,
+          message: "Ten raport jest już w archiwum.",
+          optimizedReport: rowToDailyReport(existing as unknown as ReportRow),
+        });
+      }
+
       const optimized = await optimizeReportForStorage(report);
       const pdfPath = storagePathFromRef(optimized.pdfDataUrl);
 
@@ -196,7 +236,8 @@ export async function POST(req: NextRequest) {
           createdBy: auth.context.user.id,
           createdByName: `${auth.context.user.firstName} ${auth.context.user.lastName}`.trim(),
         }),
-        { onConflict: "id" }
+        // Druga warstwa na wypadek wyścigu z /api/reports między odczytem a zapisem.
+        { onConflict: "id", ignoreDuplicates: true }
       );
 
       if (error) {
@@ -212,92 +253,109 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Zapis/Synchronizacja Użytkowników
+    //
+    // Wyłącznie upsert. Wcześniej ta akcja kasowała w bazie każdego, kogo nie
+    // było na liście z urządzenia — a lista pochodzi z pamięci przeglądarki
+    // administratora i bywa nieaktualna (drugie urządzenie, synchronizacja,
+    // która nie doszła). Jedna edycja na starym tablecie potrafiła usunąć
+    // konta dodane gdzie indziej. Kasowanie idzie teraz tylko jawnie, przez
+    // DELETE_USER, które panel i tak wywołuje.
     if (action === "SYNC_USERS" && Array.isArray(users)) {
-      const activeIds = users.map((u: User) => u.id).filter(Boolean);
-      if (activeIds.length > 0) {
-        // Usuń z Supabase użytkowników, którzy zostali usunięci w aplikacji
-        await supabase
-          .from("users")
-          .delete()
-          .not("id", "in", `(${activeIds.map((id) => `"${id}"`).join(",")})`);
+      const selfId = auth.context.user.id;
+      const self = (users as User[]).find((u) => u.id === selfId);
+      if (self && !self.isAdmin) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Nie można odebrać uprawnień administratora samemu sobie.",
+          },
+          { status: 400 }
+        );
+      }
 
-        const mapped = users.map((u: User) => ({
+      const mapped = (users as User[])
+        .filter((u) => typeof u?.id === "string" && u.id)
+        .map((u) => ({
           id: u.id,
           first_name: u.firstName,
           last_name: u.lastName,
           role: u.role,
-          is_foreman: u.isForeman,
-          is_admin: u.isAdmin,
-          login: u.login,
+          is_foreman: Boolean(u.isForeman),
+          is_admin: Boolean(u.isAdmin),
+          // Pusty login łamałby unikalny indeks na lower(login) przy drugim
+          // koncie bez loginu — w bazie ma być wtedy NULL.
+          login: typeof u.login === "string" && u.login.trim() ? u.login.trim() : null,
         }));
-        await supabase.from("users").upsert(mapped, { onConflict: "id" });
-      } else {
-        await supabase.from("users").delete().neq("id", "");
+
+      if (mapped.length > 0) {
+        const { error } = await supabase.from("users").upsert(mapped, { onConflict: "id" });
+        if (error) return syncError("użytkowników", error);
       }
       return NextResponse.json({ success: true });
     }
 
     if (action === "DELETE_USER" && body.userId) {
-      await supabase.from("users").delete().eq("id", body.userId);
+      if (body.userId === auth.context.user.id) {
+        return NextResponse.json(
+          { success: false, message: "Nie można usunąć własnego konta." },
+          { status: 400 }
+        );
+      }
+      const { error } = await supabase.from("users").delete().eq("id", body.userId);
+      if (error) return syncError("użytkownika", error);
       return NextResponse.json({ success: true });
     }
 
-    // 3. Zapis/Synchronizacja Placów Budowy
+    // 3. Zapis/Synchronizacja Placów Budowy — tylko upsert (patrz uwaga przy użytkownikach)
     if (action === "SYNC_SITES" && Array.isArray(sites)) {
-      const activeIds = sites.map((s: ConstructionSite) => s.id).filter(Boolean);
-      if (activeIds.length > 0) {
-        await supabase
-          .from("construction_sites")
-          .delete()
-          .not("id", "in", `(${activeIds.map((id) => `"${id}"`).join(",")})`);
-
-        const mapped = sites.map((s: ConstructionSite) => ({
+      const mapped = (sites as ConstructionSite[])
+        .filter((s) => typeof s?.id === "string" && s.id)
+        .map((s) => ({
           id: s.id,
           name: s.name,
           address: s.address,
           active: s.active,
         }));
-        await supabase.from("construction_sites").upsert(mapped, { onConflict: "id" });
-      } else {
-        await supabase.from("construction_sites").delete().neq("id", "");
+      if (mapped.length > 0) {
+        const { error } = await supabase
+          .from("construction_sites")
+          .upsert(mapped, { onConflict: "id" });
+        if (error) return syncError("placów budowy", error);
       }
       return NextResponse.json({ success: true });
     }
 
     if (action === "DELETE_SITE" && body.siteId) {
-      await supabase.from("construction_sites").delete().eq("id", body.siteId);
+      const { error } = await supabase.from("construction_sites").delete().eq("id", body.siteId);
+      if (error) return syncError("placu budowy", error);
       return NextResponse.json({ success: true });
     }
 
-    // 4. Zapis/Synchronizacja Szablonów Tematów
+    // 4. Zapis/Synchronizacja Szablonów Tematów — tylko upsert
     if (action === "SYNC_TOPICS" && Array.isArray(topics)) {
-      const activeIds = topics.map((t: DiscussedTopicTemplate) => t.id).filter(Boolean);
-      if (activeIds.length > 0) {
-        await supabase
-          .from("topic_templates")
-          .delete()
-          .not("id", "in", `(${activeIds.map((id) => `"${id}"`).join(",")})`);
-
-        const mapped = topics.map((t: DiscussedTopicTemplate) => ({
+      const mapped = (topics as DiscussedTopicTemplate[])
+        .filter((t) => typeof t?.id === "string" && t.id)
+        .map((t) => ({
           id: t.id,
           title: t.title,
           category: t.category || "BHP",
         }));
-        await supabase.from("topic_templates").upsert(mapped, { onConflict: "id" });
-      } else {
-        await supabase.from("topic_templates").delete().neq("id", "");
+      if (mapped.length > 0) {
+        const { error } = await supabase.from("topic_templates").upsert(mapped, { onConflict: "id" });
+        if (error) return syncError("tematów", error);
       }
       return NextResponse.json({ success: true });
     }
 
     if (action === "DELETE_TOPIC" && body.topicId) {
-      await supabase.from("topic_templates").delete().eq("id", body.topicId);
+      const { error } = await supabase.from("topic_templates").delete().eq("id", body.topicId);
+      if (error) return syncError("tematu", error);
       return NextResponse.json({ success: true });
     }
 
     // 5. Zapis/Synchronizacja Ustawień
     if (action === "SYNC_SETTINGS" && settings) {
-      await supabase.from("tenant_settings").upsert(
+      const { error } = await supabase.from("tenant_settings").upsert(
         {
           tenant_id: settings.tenantId || "tenant-sb-tech-poznan",
           organization_name: settings.organizationName,
@@ -310,6 +368,7 @@ export async function POST(req: NextRequest) {
         },
         { onConflict: "tenant_id" }
       );
+      if (error) return syncError("ustawień", error);
       return NextResponse.json({ success: true });
     }
 
@@ -324,7 +383,8 @@ export async function POST(req: NextRequest) {
         active: t.active !== undefined ? t.active : true,
         updated_at: new Date().toISOString(),
       }));
-      await supabase.from("pdf_templates").upsert(mapped, { onConflict: "id" });
+      const { error } = await supabase.from("pdf_templates").upsert(mapped, { onConflict: "id" });
+      if (error) return syncError("szablonów PDF", error);
       return NextResponse.json({ success: true });
     }
 

@@ -23,6 +23,7 @@ import {
   DiscussedTopicTemplate,
   TenantSettings,
 } from "@/types";
+import { removePolishDiacritics } from "@/lib/pdf-generator";
 
 interface AdminSettingsProps {
   users: User[];
@@ -33,6 +34,35 @@ interface AdminSettingsProps {
   onUpdateSites: (sites: ConstructionSite[]) => void;
   onUpdateTopics: (topics: DiscussedTopicTemplate[]) => void;
   onUpdateSettings: (settings: TenantSettings) => void;
+}
+
+/** Domyślny login „j.kowalski" — bez polskich znaków, spacji i symboli. */
+function defaultLogin(firstName: string, lastName: string): string {
+  const czysc = (v: string) =>
+    removePolishDiacritics(v.trim().toLowerCase()).replace(/[^a-z0-9-]/g, "");
+  const imie = czysc(firstName).slice(0, 1);
+  const nazwisko = czysc(lastName);
+  return [imie, nazwisko].filter(Boolean).join(".") || `user${Date.now()}`;
+}
+
+/** Jawne usunięcie w bazie. Zwraca wynik, żeby widok zmieniał się dopiero po sukcesie. */
+async function deleteOnServer(
+  payload: Record<string, unknown>
+): Promise<{ ok: boolean; message: string }> {
+  try {
+    const res = await fetch("/api/db/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.success) {
+      return { ok: false, message: data?.message || "Nie udało się usunąć pozycji z bazy." };
+    }
+    return { ok: true, message: "" };
+  } catch {
+    return { ok: false, message: "Brak połączenia z serwerem — nic nie zostało usunięte." };
+  }
 }
 
 export function AdminSettings({
@@ -174,11 +204,21 @@ export function AdminSettings({
       role: newUser.role.trim() || "Pracownik",
       isForeman: newUser.isForeman,
       isAdmin: newUser.isAdmin,
-      login:
-        newUser.login.trim() ||
-        `${newUser.firstName[0].toLowerCase()}.${newUser.lastName.toLowerCase()}`,
+      login: newUser.login.trim() || defaultLogin(newUser.firstName, newUser.lastName),
       createdAt: new Date().toISOString(),
     };
+
+    // Unikalny indeks w bazie odrzuciłby cały zapis listy — lepiej powiedzieć
+    // o tym od razu, zanim użytkownik zniknie po najbliższej synchronizacji.
+    const kolizja = users.find(
+      (u) => (u.login || "").toLowerCase() === created.login.toLowerCase()
+    );
+    if (kolizja) {
+      alert(
+        `Login „${created.login}" jest już zajęty (${kolizja.firstName} ${kolizja.lastName}). Wpisz inny login.`
+      );
+      return;
+    }
 
     const updated = [...users, created];
     onUpdateUsers(updated);
@@ -200,15 +240,14 @@ export function AdminSettings({
       alert("Nie można usunąć ostatniego użytkownika w systemie.");
       return;
     }
-    const updated = users.filter((u) => u.id !== userId);
-    onUpdateUsers(updated);
-    try {
-      await fetch("/api/db/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "DELETE_USER", userId }),
-      });
-    } catch {}
+    // Najpierw baza, potem widok — inaczej odrzucone usunięcie (np. własnego
+    // konta) i tak zdejmowało pozycję z listy i ogłaszało sukces.
+    const wynik = await deleteOnServer({ action: "DELETE_USER", userId });
+    if (!wynik.ok) {
+      alert(wynik.message);
+      return;
+    }
+    onUpdateUsers(users.filter((u) => u.id !== userId));
     triggerSaveBanner("Użytkownik został usunięty z bazy Supabase.");
   };
 
@@ -235,15 +274,12 @@ export function AdminSettings({
       alert("W systemie musi pozostać co najmniej jeden plac budowy.");
       return;
     }
-    const updated = sites.filter((s) => s.id !== siteId);
-    onUpdateSites(updated);
-    try {
-      await fetch("/api/db/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "DELETE_SITE", siteId }),
-      });
-    } catch {}
+    const wynik = await deleteOnServer({ action: "DELETE_SITE", siteId });
+    if (!wynik.ok) {
+      alert(wynik.message);
+      return;
+    }
+    onUpdateSites(sites.filter((s) => s.id !== siteId));
     triggerSaveBanner("Plac budowy został usunięty z bazy Supabase.");
   };
 
@@ -264,15 +300,12 @@ export function AdminSettings({
   };
 
   const handleDeleteTopic = async (topicId: string) => {
-    const updated = topicTemplates.filter((t) => t.id !== topicId);
-    onUpdateTopics(updated);
-    try {
-      await fetch("/api/db/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "DELETE_TOPIC", topicId }),
-      });
-    } catch {}
+    const wynik = await deleteOnServer({ action: "DELETE_TOPIC", topicId });
+    if (!wynik.ok) {
+      alert(wynik.message);
+      return;
+    }
+    onUpdateTopics(topicTemplates.filter((t) => t.id !== topicId));
     triggerSaveBanner("Szablon tematu został usunięty z bazy Supabase.");
   };
 

@@ -1,6 +1,6 @@
 import { getSupabaseClient } from "./supabase";
 import { DailyReport, AttendanceRecord, PhotoDocumentationItem } from "@/types";
-import { BUCKET_NAME, toAppFileUrl } from "./storage-paths";
+import { BUCKET_NAME, signatureStoragePath, toAppFileUrl } from "./storage-paths";
 
 export { BUCKET_NAME };
 
@@ -101,7 +101,11 @@ export async function optimizeReportForStorage(report: DailyReport): Promise<Dai
     const updatedAttendance: AttendanceRecord[] = await Promise.all(
       optimized.attendanceList.map(async (att, idx) => {
         if (att.signatureDataUrl && att.signatureDataUrl.startsWith("data:")) {
-          const sigPath = `signatures/${dateStr}_${att.userId}_${idx}.png`;
+          // Identyfikator raportu w nazwie jest obowiązkowy. Bez niego dwie odprawy
+          // tego samego dnia (drugi plac, powtórzona odprawa) z tym samym
+          // pracownikiem na tej samej pozycji listy dawały identyczną ścieżkę,
+          // a upsert nadpisywał podpis w raporcie złożonym wcześniej.
+          const sigPath = signatureStoragePath(dateStr, optimized.id, att.userId, idx);
           const sigUrl = await uploadBase64ToStorage(att.signatureDataUrl, sigPath, "image/png");
           return {
             ...att,

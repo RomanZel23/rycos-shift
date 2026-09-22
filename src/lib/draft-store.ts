@@ -29,6 +29,8 @@ const MAX_AGE_DAYS = 7;
 export type DraftKind = "START_SHIFT" | "END_SHIFT";
 
 export interface StartShiftDraft {
+  /** Identyfikator raportu — ten sam przy każdej próbie wysyłki tego formularza. */
+  reportId?: string;
   date: string;
   time: string;
   siteId: string;
@@ -39,6 +41,8 @@ export interface StartShiftDraft {
 }
 
 export interface EndShiftDraft {
+  /** Identyfikator raportu — ten sam przy każdej próbie wysyłki tego formularza. */
+  reportId?: string;
   date: string;
   time: string;
   siteId: string;

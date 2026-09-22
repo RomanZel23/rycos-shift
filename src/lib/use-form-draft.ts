@@ -42,12 +42,12 @@ export function useFormDraft<T extends DraftPayload>(
   const latest = useRef(payload);
   const onRestoreRef = useRef(onRestore);
 
-  // Refy aktualizujemy w efekcie, a nie w trakcie renderu. React Compiler
-  // (babel-plugin-react-compiler jest włączony w tym projekcie) może zapamiętać
-  // ciało komponentu i pominąć przypisanie w renderze — wtedy `latest.current`
-  // zostałby ze starą zawartością formularza i zapis awaryjny przy chowaniu
-  // aplikacji utrwaliłby stan sprzed kilku zdjęć. Czyli dokładnie tę stratę,
-  // której ten hook ma zapobiegać.
+  // Refy aktualizujemy w efekcie, a nie w trakcie renderu — tak zaleca React
+  // (reguła react-hooks/refs) i tak jest bezpiecznie, gdyby kiedyś włączyć
+  // React Compiler: mógłby on zapamiętać ciało komponentu i pominąć
+  // przypisanie w renderze, a wtedy zapis awaryjny przy chowaniu aplikacji
+  // utrwaliłby stan sprzed kilku zdjęć. Kompilator NIE jest włączony
+  // (next.config.ts nie ma reactCompiler), paczka została usunięta.
   useEffect(() => {
     latest.current = payload;
   }, [payload]);

@@ -77,3 +77,22 @@ export function normalizeStoredFileRef<T extends string | undefined | null>(valu
 
   return value;
 }
+
+/** Fragment ścieżki bezpieczny dla walidatora ścieżek w buckecie. */
+function pathPart(value: string | undefined, fallback: string): string {
+  const clean = String(value || "").replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 60);
+  return clean || fallback;
+}
+
+/** Ścieżka podpisu — unikalna per raport, pracownik i pozycja na liście. */
+export function signatureStoragePath(
+  dateStr: string,
+  reportId: string,
+  userId: string,
+  idx: number
+): string {
+  return `signatures/${pathPart(dateStr, "data")}_${pathPart(reportId, "raport")}_${pathPart(
+    userId,
+    "osoba"
+  )}_${idx}.png`;
+}

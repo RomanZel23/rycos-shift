@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { clientIpFromHeaders } from "@/lib/client-ip";
 import {
   GATE_COOKIE,
   expectedGateToken,
@@ -22,9 +23,7 @@ const WINDOW_MS = 15 * 60 * 1000;
 const attempts = new Map<string, { count: number; resetAt: number }>();
 
 function clientKey(req: NextRequest): string {
-  const fwd = req.headers.get("x-forwarded-for");
-  if (fwd) return fwd.split(",")[0].trim();
-  return req.headers.get("x-real-ip") || "unknown";
+  return clientIpFromHeaders(req.headers);
 }
 
 function tooManyAttempts(key: string): boolean {
